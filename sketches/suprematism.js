@@ -117,34 +117,44 @@ const frag = glsl(/*glsl*/ `
     return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
   }
 
+  // Operations
+  mat2 rotate2d(float _angle){
+    return mat2(cos(_angle),-sin(_angle),
+                sin(_angle),cos(_angle));
+  }
+
+  float opUnion( float d1, float d2 ) { return min(d1, d2); }
+  float opSmoothUnion( float d1, float d2, float k ) {
+    float h = clamp( 0.5 + 0.5*(d2-d1)/k, 0.0, 1.0 );
+    return mix( d2, d1, h ) - k*h*(1.0-h);
+  }
+
+  // SDF Shapes
   float sdRoundBox( vec3 p, vec3 b, float r ) {
     vec3 q = abs(p) - b;
     return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
   }
 
-  mat4 rotation3d(vec3 axis, float angle) {
-    axis = normalize(axis);
-    float s = sin(angle);
-    float c = cos(angle);
-    float oc = 1.0 - c;
-
-    return mat4(
-      oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
-      oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
-      oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
-      0.0,                                0.0,                                0.0,                                1.0
-    );
+  float sdRoundedCylinder(vec3 p, float ra, float rb, float h) {
+    vec2 d = vec2( length(p.xz)-2.0*ra+rb, abs(p.y) - h );
+    return min(max(d.x,d.y),0.0) + length(max(d,0.0)) - rb;
   }
 
-  float opUnion( float d1, float d2 ) { return min(d1, d2); }
-
   float block(in vec3 pos, in float r) {
+    // float size = boxSize.x / 2.;
+    // pos.yz = rotate2d(PI / 2.) * pos.yz;
+    // float d1 = sdRoundedCylinder(pos + p1, size, r, size);
+    // float d2 = sdRoundedCylinder(pos + p2, size, r, size);
+    // float d3 = sdRoundedCylinder(pos + p3, size, r, size);
+    // float d4 = sdRoundedCylinder(pos + p4, size, r, size);
+
     float d1 = sdRoundBox(pos + p1, boxSize, r);
     float d2 = sdRoundBox(pos + p2, boxSize, r);
     float d3 = sdRoundBox(pos + p3, boxSize, r);
     float d4 = sdRoundBox(pos + p4, boxSize, r);
 
     return opUnion(opUnion(d1, d2), opUnion(d3, d4));
+    // return opSmoothUnion(opSmoothUnion(d1, d2, 0.01), opSmoothUnion(d3, d4, 0.01), 0.01);
   }
 
   float map(in vec3 pos) {
@@ -152,8 +162,8 @@ const frag = glsl(/*glsl*/ `
     float r = 0.0125;
 
     // float angle = (time / (cycle * 2.)) * PI;
-    float angle = playhead * 2. * PI;
-    pos.xyz = (rotation3d(vec3(0., 1., 0.), angle) * vec4(pos, 1.0)).xyz;
+    // float angle = playhead * 2. * PI;
+    // pos.xyz = (rotation3d(vec3(0., 1., 0.), angle) * vec4(pos, 1.0)).xyz;
     d = block(pos, r);
 
     return d;
