@@ -11,7 +11,7 @@ const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 10,
+  duration: 8,
 };
 
 const palettes = [
@@ -52,6 +52,7 @@ const frag = glsl(/*glsl*/ `
   precision highp float;
 
   uniform float time;
+  uniform float duration;
   uniform vec3 background;
   uniform vec3 foreground;
   uniform vec3 rotationAxis;
@@ -59,6 +60,8 @@ const frag = glsl(/*glsl*/ `
   uniform float offsetY;
   uniform vec3 boxSize;
   varying vec2 vUv;
+
+  float cycle = duration / 5.;
 
   struct Block {
     vec3 p1;
@@ -96,10 +99,10 @@ const frag = glsl(/*glsl*/ `
   );
 
   Block iBlock = Block(
+    vec3(0.25, 0., 0.),
     vec3(-0.25, 0., 0.),
-    vec3(-0.5, 0., 0.),
     vec3(0.5, 0., 0.),
-    vec3(0.25, 0., 0.)
+    vec3(-0.5, 0., 0.)
   );
 
   vec3 p1 = iBlock.p1;
@@ -147,11 +150,8 @@ const frag = glsl(/*glsl*/ `
     float d = 1e10;
     float r = 0.0125;
 
-    // float angle = sin(time * 2. * PI) * PI * .5;
-    // pos.xyz = (rotation3d(rotationAxis, angle) * vec4(pos, 1.0)).xyz;
-
-    float angle = time / 2. * PI;
-    pos.xyz = (rotation3d(vec3(0., 1., 0.), angle) * vec4(pos, 1.0)).xyz;
+    // float angle = (time / (cycle * 2.)) * PI;
+    // pos.xyz = (rotation3d(vec3(0., 1., 0.), angle) * vec4(pos, 1.0)).xyz;
     d = block(pos, r);
 
     return d;
@@ -180,6 +180,12 @@ const frag = glsl(/*glsl*/ `
         e.yxy * map(pos + e.yxy * eps) + e.xxx * map(pos + e.xxx * eps));
   }
 
+  float EaseOutQuad(float x) {
+    return 1.0 - (1.0-x) * (1.0 -x );
+  }
+
+  float EaseOutQuart(float x) { return 1.0 - pow(1.0 -x, 4.0); }
+
   void main() {
     vec3 ro = vec3(1.5, 1.5, 1.5);
     vec3 ta = vec3(0.0, 0.0, 0.0);
@@ -194,29 +200,31 @@ const frag = glsl(/*glsl*/ `
     // create view ray
     vec3 rd = normalize(p.x * uu + p.y * vv + 1.5 * ww);
 
-    float at = min(1., mapRange(fract(time / 2.), 0., 0.5, 0., 1.));
+    // float at = min(1., mapRange(fract(time / 2.), 0., 0.5, 0., 1.));
+    float cycleTime = fract(time / cycle);
+    float at = EaseOutQuart(min(1., mapRange(cycleTime, 0., 0.5, 0., 1.)));
 
-    if (time < 2.) {
+    if (time < duration * 0.2) {
       p1 = mix(iBlock.p1, oBlock.p1, at);
       p2 = mix(iBlock.p2, oBlock.p2, at);
       p3 = mix(iBlock.p3, oBlock.p3, at);
       p4 = mix(iBlock.p4, oBlock.p4, at);
-    } else if (time < 4.) {
+    } else if (time < duration * 0.4) {
       p1 = mix(oBlock.p1, zBlock.p1, at);
       p2 = mix(oBlock.p2, zBlock.p2, at);
       p3 = mix(oBlock.p3, zBlock.p3, at);
       p4 = mix(oBlock.p4, zBlock.p4, at);
-    } else if (time < 6.) {
+    } else if (time < duration * 0.6) {
       p1 = mix(zBlock.p1, tBlock.p1, at);
       p2 = mix(zBlock.p2, tBlock.p2, at);
       p3 = mix(zBlock.p3, tBlock.p3, at);
       p4 = mix(zBlock.p4, tBlock.p4, at);
-    } else if (time < 8.) {
+    } else if (time < duration * 0.8) {
       p1 = mix(tBlock.p1, lBlock.p1, at);
       p2 = mix(tBlock.p2, lBlock.p2, at);
       p3 = mix(tBlock.p3, lBlock.p3, at);
       p4 = mix(tBlock.p4, lBlock.p4, at);
-    } else if (time < 10.) {
+    } else if (time < duration * 1.0) {
       p1 = mix(lBlock.p1, iBlock.p1, at);
       p2 = mix(lBlock.p2, iBlock.p2, at);
       p3 = mix(lBlock.p3, iBlock.p3, at);
@@ -272,6 +280,7 @@ const sketch = ({ gl }) => {
       foreground: new THREE.Color(foreground).toArray(),
       rotationAxis,
       time: ({ time }) => time,
+      duration: ({ duration }) => duration,
       offsetX: offset,
       offsetY: offset,
       boxSize: [0.25, 0.25, 0.25],

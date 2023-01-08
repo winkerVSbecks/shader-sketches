@@ -9,7 +9,7 @@ const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 8,
+  duration: 2,
 };
 
 const frag = glsl(/*glsl*/ `
@@ -81,6 +81,11 @@ const frag = glsl(/*glsl*/ `
     return vec3(m*p.xy,p.z);
   }
 
+  mat2 rotate2d(float _angle){
+    return mat2(cos(_angle),-sin(_angle),
+                sin(_angle),cos(_angle));
+  }
+
   float map(in vec3 pos) {
     float d = 1e10;
 
@@ -89,6 +94,9 @@ const frag = glsl(/*glsl*/ `
     float t = 0.01;
 
     d = min(d, sdSphere(pos, r));
+
+    // pos = (rotation3d(vec3(0., 1., 0.), PI * .0625) * vec3(pos, 1.0)).xyz;
+    pos.xz = rotate2d(PI * .125) * pos.xz;
 
     for (int l = 0; l < 4; l++) {
       for (int theta = 0; theta < 4; theta++) {
@@ -100,11 +108,16 @@ const frag = glsl(/*glsl*/ `
         q = (rotation3d(vec3(0., 0., 1.), rotation) * vec4(q, 1.0)).xyz;
 
         float rotation2 = PI * 0.25;
-        float start = PI * 0.125;
+        float start = PI * 0.2;
+
+        if (theta == 1) {
+          rotation2 = PI * 0.2;
+          start =  PI * 0.25;
+        }
 
         if (theta == 3) {
           rotation2 = PI * 0.75;
-          start = PI * 0.625;
+          start = PI * 0.7;
         }
 
         q = (
@@ -114,8 +127,8 @@ const frag = glsl(/*glsl*/ `
           ) * vec4(q, 1.0)
         ).xyz;
 
-        // float bend = cos(time * PI) * -1.;
-        // q = opBend(bend, q);
+        float bend = cos(time * PI) * .2;
+        q = opBend(bend, q);
         d = min(d, sdCutHollowSphere(q, r + 0.125 * float(l), h, t));
       }
     }
@@ -147,10 +160,7 @@ const frag = glsl(/*glsl*/ `
   }
 
   void main() {
-    // float an = sin(0.2 * time);
-    // vec3 ro = vec3(3.0 * cos(an), 2.0, 3.0 * sin(an));
     vec3 ro = vec3(0.0, 2.0, 2.0);
-    // vec3 ro = vec3(0., 3., 3.);
     vec3 ta = vec3(0.0, 0.0, 0.0);
     // camera matrix
     vec3 ww = normalize(ta - ro);
@@ -175,8 +185,8 @@ const frag = glsl(/*glsl*/ `
 
     // shading/lighting
     vec3 col = vec3(0.0);
+    vec3 pos = ro + t * rd;
     if (t < tmax) {
-      vec3 pos = ro + t * rd;
       vec3 nor = calcNormal(pos);
       vec3 light = vec3(.57703);
       float dif = clamp(dot(nor, light), 0.0, 1.0);
@@ -188,10 +198,6 @@ const frag = glsl(/*glsl*/ `
       col = vec3(0.2, 0.3, 0.4) * amb + vec3(0.8, 0.7, 0.5) * dif;
     }
 
-    // gamma
-    // col = sqrt(col);
-
-    vec3 pos = ro + t * rd;
     vec3 tint = mix(diffusion, foreground, length(pos));
     if (length(pos) <= 0.26) { tint = vec3(0.922,0.871,0.769); }
     vec3 tot = mix(background, tint, col);
