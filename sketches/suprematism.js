@@ -51,71 +51,39 @@ function colors(minContrast = 3) {
 const frag = glsl(/*glsl*/ `
   precision highp float;
 
+  struct Block {
+    vec3 loc;
+    vec3 nLoc;
+    int shape;
+    int nShape;
+    vec3 col;
+  };
+
   uniform float time;
-  uniform float duration;
   uniform float playhead;
   uniform vec3 background;
   uniform vec3 foreground;
-  uniform vec3 rotationAxis;
-  uniform float offsetX;
-  uniform float offsetY;
-  uniform vec3 boxSize;
+  uniform float size;
   varying vec2 vUv;
 
-  float cycle = duration / 5.;
+  uniform Block block1;
+  uniform Block block2;
+  uniform Block block3;
+  uniform Block block4;
+  uniform Block block5;
+  uniform Block block6;
+  uniform Block block7;
+  uniform Block block8;
 
-  struct Block {
-    vec3 p1;
-    vec3 p2;
-    vec3 p3;
-    vec3 p4;
-  };
-
-  Block oBlock = Block(
-    vec3(0.25, 0.25, 0.),
-    vec3(-0.25, 0.25, 0.),
-    vec3(0.25, -0.25, 0.),
-    vec3(-0.25, -0.25, 0.)
-  );
-
-  Block zBlock = Block(
-    vec3(0.0, 0.25, 0.0),
-    vec3(-0.5, 0.25, 0.0),
-    vec3(0.5, -0.25, 0.0),
-    vec3(0.0, -0.25, 0.0)
-  );
-
-  Block tBlock = Block(
-    vec3(0.0, 0.25, 0.0),
-    vec3(-0.5, 0.25, 0.0),
-    vec3(0.5, 0.25, 0.0),
-    vec3(0.0, -0.25, 0.0)
-  );
-
-  Block lBlock = Block(
-    vec3(0.0, 0.25, 0.0),
-    vec3(-0.5, 0.25, 0.0),
-    vec3(0.5, 0.25, 0.0),
-    vec3(-0.5, -0.25, 0.0)
-  );
-
-  Block iBlock = Block(
-    vec3(0.5, 0.0, 0.0),
-    vec3(0.0, 0.0, 0.0),
-    vec3(1.0, 0.0, 0.0),
-    vec3(-0.5, 0.0, 0.0)
-  );
-
-  vec3 p1 = iBlock.p1;
-  vec3 p2 = iBlock.p2;
-  vec3 p3 = iBlock.p3;
-  vec3 p4 = iBlock.p4;
 
   #define PI 3.14159265359
 
+  // Utils
   float mapRange(float value, float min1, float max1, float min2, float max2) {
     return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
   }
+
+  float EaseOutQuart(float x) { return 1.0 - pow(1.0 -x, 4.0); }
 
   // Operations
   mat2 rotate2d(float _angle){
@@ -130,41 +98,61 @@ const frag = glsl(/*glsl*/ `
   }
 
   // SDF Shapes
-  float sdRoundBox( vec3 p, vec3 b, float r ) {
+  float sdBox( vec3 p, vec3 b, float r ) {
     vec3 q = abs(p) - b;
     return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
   }
 
-  float sdRoundedCylinder(vec3 p, float ra, float rb, float h) {
+  float sdCylinder(vec3 p, float ra, float rb, float h) {
+    p.yz = rotate2d(PI / 2.) * p.yz;
     vec2 d = vec2( length(p.xz)-2.0*ra+rb, abs(p.y) - h );
     return min(max(d.x,d.y),0.0) + length(max(d,0.0)) - rb;
   }
 
-  float block(in vec3 pos, in float r) {
-    // float size = boxSize.x / 2.;
-    // pos.yz = rotate2d(PI / 2.) * pos.yz;
-    // float d1 = sdRoundedCylinder(pos + p1, size, r, size);
-    // float d2 = sdRoundedCylinder(pos + p2, size, r, size);
-    // float d3 = sdRoundedCylinder(pos + p3, size, r, size);
-    // float d4 = sdRoundedCylinder(pos + p4, size, r, size);
+  float sdHexPrism( vec3 p, vec2 h, float r ) {
+    const vec3 k = vec3(-0.8660254, 0.5, 0.57735);
+    p = abs(p);
+    p.xy -= 2.0*min(dot(k.xy, p.xy), 0.0)*k.xy;
+    vec2 d = vec2(
+        length(p.xy-vec2(clamp(p.x,-k.z*h.x,k.z*h.x), h.x))*sign(p.y-h.x),
+        p.z-h.y );
+    return min(max(d.x,d.y),0.0) + length(max(d,0.0)) - r;
+  }
 
-    float d1 = sdRoundBox(pos + p1, boxSize, r);
-    float d2 = sdRoundBox(pos + p2, boxSize, r);
-    float d3 = sdRoundBox(pos + p3, boxSize, r);
-    float d4 = sdRoundBox(pos + p4, boxSize, r);
+  float sdTriPrism( vec3 p, vec2 h, float r ) {
+    vec3 q = abs(p);
+    return max(q.z-h.y,max(q.x*0.866025+p.y*0.5,-p.y)-h.x*0.5) - r;
+  }
 
-    return opUnion(opUnion(d1, d2), opUnion(d3, d4));
-    // return opSmoothUnion(opSmoothUnion(d1, d2, 0.01), opSmoothUnion(d3, d4, 0.01), 0.01);
+  float block(in int type, in vec3 pos) {
+    float r = 0.0125;
+
+    if (type == 0) return sdBox(pos, vec3(size), r);
+    else if (type == 1) return sdCylinder(pos, size, r, size);
+    else if (type == 2) return sdHexPrism(pos, vec2(size), r);
+    else if (type == 3) return sdTriPrism(pos, vec2(size), r);
+    return 0.;
   }
 
   float map(in vec3 pos) {
+    float cycleTime = fract(time);
+    // float at = EaseOutQuart(cycleTime);
+    float at = EaseOutQuart(min(1., mapRange(cycleTime, 0., 0.75, 0., 1.)));
+
     float d = 1e10;
     float r = 0.0125;
 
-    // float angle = (time / (cycle * 2.)) * PI;
     // float angle = playhead * 2. * PI;
-    // pos.xyz = (rotation3d(vec3(0., 1., 0.), angle) * vec4(pos, 1.0)).xyz;
-    d = block(pos, r);
+    // pos.xz = rotate2d(angle) * pos.xz;
+
+    d = block(block1.shape, pos + mix(block1.loc, block1.nLoc, at));
+    d = min(d, block(block2.shape, pos + mix(block2.loc, block2.nLoc, at)));
+    d = min(d, block(block3.shape, pos + mix(block3.loc, block3.nLoc, at)));
+    d = min(d, block(block4.shape, pos + mix(block4.loc, block4.nLoc, at)));
+    d = min(d, block(block5.shape, pos + mix(block5.loc, block5.nLoc, at)));
+    d = min(d, block(block6.shape, pos + mix(block6.loc, block6.nLoc, at)));
+    d = min(d, block(block7.shape, pos + mix(block7.loc, block7.nLoc, at)));
+    d = min(d, block(block8.shape, pos + mix(block8.loc, block8.nLoc, at)));
 
     return d;
   }
@@ -192,12 +180,6 @@ const frag = glsl(/*glsl*/ `
         e.yxy * map(pos + e.yxy * eps) + e.xxx * map(pos + e.xxx * eps));
   }
 
-  float EaseOutQuad(float x) {
-    return 1.0 - (1.0-x) * (1.0 -x );
-  }
-
-  float EaseOutQuart(float x) { return 1.0 - pow(1.0 -x, 4.0); }
-
   void main() {
     vec3 ro = vec3(1.5, 1.5, 1.5);
     vec3 ta = vec3(0.0, 0.0, 0.0);
@@ -211,37 +193,6 @@ const frag = glsl(/*glsl*/ `
 
     // create view ray
     vec3 rd = normalize(p.x * uu + p.y * vv + 1.5 * ww);
-
-    // float at = min(1., mapRange(fract(time / 2.), 0., 0.5, 0., 1.));
-    float cycleTime = fract(time / cycle);
-    float at = EaseOutQuart(min(1., mapRange(cycleTime, 0., 0.5, 0., 1.)));
-
-    if (time < duration * 0.2) {
-      p1 = mix(iBlock.p1, oBlock.p1, at);
-      p2 = mix(iBlock.p2, oBlock.p2, at);
-      p3 = mix(iBlock.p3, oBlock.p3, at);
-      p4 = mix(iBlock.p4, oBlock.p4, at);
-    } else if (time < duration * 0.4) {
-      p1 = mix(oBlock.p1, zBlock.p1, at);
-      p2 = mix(oBlock.p2, zBlock.p2, at);
-      p3 = mix(oBlock.p3, zBlock.p3, at);
-      p4 = mix(oBlock.p4, zBlock.p4, at);
-    } else if (time < duration * 0.6) {
-      p1 = mix(zBlock.p1, tBlock.p1, at);
-      p2 = mix(zBlock.p2, tBlock.p2, at);
-      p3 = mix(zBlock.p3, tBlock.p3, at);
-      p4 = mix(zBlock.p4, tBlock.p4, at);
-    } else if (time < duration * 0.8) {
-      p1 = mix(tBlock.p1, lBlock.p1, at);
-      p2 = mix(tBlock.p2, lBlock.p2, at);
-      p3 = mix(tBlock.p3, lBlock.p3, at);
-      p4 = mix(tBlock.p4, lBlock.p4, at);
-    } else if (time < duration * 1.0) {
-      p1 = mix(lBlock.p1, iBlock.p1, at);
-      p2 = mix(lBlock.p2, iBlock.p2, at);
-      p3 = mix(lBlock.p3, iBlock.p3, at);
-      p4 = mix(lBlock.p4, iBlock.p4, at);
-    }
 
     // raymarch
     const float tmax = 5.0;
@@ -277,12 +228,28 @@ const frag = glsl(/*glsl*/ `
   }
 `);
 
+const randomComponent = () =>
+  Random.pick([-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75]);
+const randomDepth = () => Random.pick([-0.5, 0, 0.5]);
+const randomLocation = () => [
+  randomComponent(),
+  randomComponent(),
+  randomDepth(),
+];
+const randomShape = () => Random.rangeFloor(0, 4);
+
 const sketch = ({ gl }) => {
   const { name, background, foreground } = colors();
   console.log({ name, background, foreground });
-  const rotationAxis = Random.quaternion();
-  rotationAxis.pop();
-  const offset = Random.range(-0.125, 0.125);
+
+  const blocks = new Array(8).fill(0).map(() => ({
+    locations: new Array(8).fill(0).map(randomLocation),
+    shape: randomShape(),
+  }));
+
+  blocks.forEach((block) => {
+    block.locations.push(block.locations[0]);
+  });
 
   return createShader({
     gl,
@@ -290,13 +257,57 @@ const sketch = ({ gl }) => {
     uniforms: {
       background: new THREE.Color(background).toArray(),
       foreground: new THREE.Color(foreground).toArray(),
-      rotationAxis,
       time: ({ time }) => time,
-      duration: ({ duration }) => duration,
       playhead: ({ playhead }) => playhead,
-      offsetX: offset,
-      offsetY: offset,
-      boxSize: [0.25, 0.25, 0.25],
+      size: 0.25,
+
+      'block1.loc': ({ time }) => blocks[0].locations[Math.floor(time)],
+      'block1.nLoc': ({ time }) => blocks[0].locations[Math.floor(time) + 1],
+      'block1.shape': blocks[0].shape,
+      'block1.nShape': 0,
+      'block1.col': new THREE.Color(foreground).toArray(),
+
+      'block2.loc': ({ time }) => blocks[1].locations[Math.floor(time)],
+      'block2.nLoc': ({ time }) => blocks[1].locations[Math.floor(time) + 1],
+      'block2.shape': blocks[1].shape,
+      'block2.nShape': 0,
+      'block2.col': new THREE.Color(foreground).toArray(),
+
+      'block3.loc': ({ time }) => blocks[2].locations[Math.floor(time)],
+      'block3.nLoc': ({ time }) => blocks[2].locations[Math.floor(time) + 1],
+      'block3.shape': blocks[2].shape,
+      'block3.nShape': 0,
+      'block3.col': new THREE.Color(foreground).toArray(),
+
+      'block4.loc': ({ time }) => blocks[3].locations[Math.floor(time)],
+      'block4.nLoc': ({ time }) => blocks[3].locations[Math.floor(time) + 1],
+      'block4.shape': blocks[3].shape,
+      'block4.nShape': 0,
+      'block4.col': new THREE.Color(foreground).toArray(),
+
+      'block5.loc': ({ time }) => blocks[4].locations[Math.floor(time)],
+      'block5.nLoc': ({ time }) => blocks[4].locations[Math.floor(time) + 1],
+      'block5.shape': blocks[4].shape,
+      'block5.nShape': 0,
+      'block5.col': new THREE.Color(foreground).toArray(),
+
+      'block6.loc': ({ time }) => blocks[5].locations[Math.floor(time)],
+      'block6.nLoc': ({ time }) => blocks[5].locations[Math.floor(time) + 1],
+      'block6.shape': blocks[5].shape,
+      'block6.nShape': 0,
+      'block6.col': new THREE.Color(foreground).toArray(),
+
+      'block7.loc': ({ time }) => blocks[6].locations[Math.floor(time)],
+      'block7.nLoc': ({ time }) => blocks[6].locations[Math.floor(time) + 1],
+      'block7.shape': blocks[6].shape,
+      'block7.nShape': 0,
+      'block7.col': new THREE.Color(foreground).toArray(),
+
+      'block8.loc': ({ time }) => blocks[7].locations[Math.floor(time)],
+      'block8.nLoc': ({ time }) => blocks[7].locations[Math.floor(time) + 1],
+      'block8.shape': blocks[7].shape,
+      'block8.nShape': 0,
+      'block8.col': new THREE.Color(foreground).toArray(),
     },
   });
 };
