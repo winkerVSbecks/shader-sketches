@@ -6,7 +6,6 @@ const glsl = require('glslify');
 const tome = require('chromotome');
 const THREE = require('three');
 
-// Setup our sketch
 const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
@@ -14,27 +13,16 @@ const settings = {
   duration: 8,
 };
 
-const palettes = [
-  'spatial02',
-  'spatial03i',
-  'ducci_f',
-  'rohlfs_2',
-  'ducci_d',
-  'revolucion',
-  'butterfly',
-  'floratopia',
-  'ducci_i',
-  'spatial02i',
-];
-
-function colors(minContrast = 3) {
-  let palette = tome.get(Random.pick(palettes));
+function colors(minContrast = 1) {
+  let palette = tome.get();
   if (!palette.background) palette = tome.get();
 
   const background = palette.background;
 
   const colors = palette.colors.filter(
-    (color) => Color.contrastRatio(background, color) >= minContrast
+    (color) =>
+      Color.contrastRatio(background, color) >= minContrast &&
+      color !== background
   );
 
   const stroke = palette.stroke === background ? null : palette.stroke;
@@ -45,6 +33,8 @@ function colors(minContrast = 3) {
     name: palette.name,
     background,
     foreground,
+    shadow: stroke && Color.relativeLuminance(stroke) < 0.5 ? stroke : '#333',
+    fills: colors,
   };
 }
 
@@ -55,15 +45,16 @@ const frag = glsl(/*glsl*/ `
     vec3 loc;
     vec3 nLoc;
     int shape;
-    int nShape;
     vec3 col;
+    float size;
   };
 
   uniform float time;
   uniform float playhead;
+  uniform float loopTime;
   uniform vec3 background;
   uniform vec3 foreground;
-  uniform float size;
+  uniform vec3 shadow;
   varying vec2 vUv;
 
   uniform Block block1;
@@ -124,37 +115,55 @@ const frag = glsl(/*glsl*/ `
     return max(q.z-h.y,max(q.x*0.866025+p.y*0.5,-p.y)-h.x*0.5) - r;
   }
 
-  float block(in int type, in vec3 pos) {
+  float block(int type, vec3 pos, float size) {
     float r = 0.0125;
 
     if (type == 0) return sdBox(pos, vec3(size), r);
-    else if (type == 1) return sdCylinder(pos, size, r, size);
+    else if (type == 1) return sdCylinder(pos, size / 2., r, size);
     else if (type == 2) return sdHexPrism(pos, vec2(size), r);
     else if (type == 3) return sdTriPrism(pos, vec2(size), r);
     return 0.;
   }
 
-  float map(in vec3 pos) {
-    float cycleTime = fract(time);
-    // float at = EaseOutQuart(cycleTime);
-    float at = EaseOutQuart(min(1., mapRange(cycleTime, 0., 0.75, 0., 1.)));
+  vec4 unionSDF(vec4 a, vec4 b) {
+    return a.w < b.w ? a : b;
+  }
 
-    float d = 1e10;
+  vec4 mapBlocks(in vec3 pos) {
+    float at = EaseOutQuart(min(1., mapRange(loopTime, 0., 0.5, 0., 1.)));
+
     float r = 0.0125;
 
-    // float angle = playhead * 2. * PI;
-    // pos.xz = rotate2d(angle) * pos.xz;
+    vec4 d1 = vec4(block1.col,
+      block(block1.shape, pos + mix(block1.loc, block1.nLoc, at), block1.size)
+    );
+    vec4 d2 = vec4(block2.col,
+      block(block2.shape, pos + mix(block2.loc, block2.nLoc, at), block2.size)
+    );
+    vec4 d3 = vec4(block3.col,
+      block(block3.shape, pos + mix(block3.loc, block3.nLoc, at), block3.size)
+    );
+    vec4 d4 = vec4(block4.col,
+      block(block4.shape, pos + mix(block4.loc, block4.nLoc, at), block4.size)
+    );
+    vec4 d5 = vec4(block5.col,
+      block(block5.shape, pos + mix(block5.loc, block5.nLoc, at), block5.size)
+    );
+    vec4 d6 = vec4(block6.col,
+      block(block6.shape, pos + mix(block6.loc, block6.nLoc, at), block6.size)
+    );
+    vec4 d7 = vec4(block7.col,
+      block(block7.shape, pos + mix(block7.loc, block7.nLoc, at), block7.size)
+    );
+    vec4 d8 = vec4(block8.col,
+      block(block8.shape, pos + mix(block8.loc, block8.nLoc, at), block8.size)
+    );
 
-    d = block(block1.shape, pos + mix(block1.loc, block1.nLoc, at));
-    d = min(d, block(block2.shape, pos + mix(block2.loc, block2.nLoc, at)));
-    d = min(d, block(block3.shape, pos + mix(block3.loc, block3.nLoc, at)));
-    d = min(d, block(block4.shape, pos + mix(block4.loc, block4.nLoc, at)));
-    d = min(d, block(block5.shape, pos + mix(block5.loc, block5.nLoc, at)));
-    d = min(d, block(block6.shape, pos + mix(block6.loc, block6.nLoc, at)));
-    d = min(d, block(block7.shape, pos + mix(block7.loc, block7.nLoc, at)));
-    d = min(d, block(block8.shape, pos + mix(block8.loc, block8.nLoc, at)));
+    return unionSDF(unionSDF(unionSDF(unionSDF(unionSDF(unionSDF(unionSDF(d1, d2), d3), d4), d5), d6), d7), d8);
+  }
 
-    return d;
+  float map(in vec3 pos) {
+    return mapBlocks(pos).w;
   }
 
   // https://iquilezles.org/articles/rmshadows
@@ -181,7 +190,8 @@ const frag = glsl(/*glsl*/ `
   }
 
   void main() {
-    vec3 ro = vec3(1.5, 1.5, 1.5);
+    vec3 ro = vec3(2.);
+    // vec3 ro = vec3(0., 0., 5.);
     vec3 ta = vec3(0.0, 0.0, 0.0);
     // camera matrix
     vec3 ww = normalize(ta - ro);
@@ -195,7 +205,7 @@ const frag = glsl(/*glsl*/ `
     vec3 rd = normalize(p.x * uu + p.y * vv + 1.5 * ww);
 
     // raymarch
-    const float tmax = 5.0;
+    const float tmax = 12.0;
     float t = 0.0;
     for (int i = 0; i < 256; i++) {
       vec3 pos = ro + t * rd;
@@ -206,9 +216,11 @@ const frag = glsl(/*glsl*/ `
     }
 
     // shading/lighting
-    vec3 col = vec3(0.0);
+    vec3 col = vec3(shadow);
+    vec3 tot = background;
+
     if (t < tmax) {
-      vec3 pos = ro + t * rd;
+    vec3 pos = ro + t * rd;
       vec3 nor = calcNormal(pos);
       vec3 light = vec3(.57703);
       float dif = clamp(dot(nor, light), 0.0, 1.0);
@@ -218,11 +230,13 @@ const frag = glsl(/*glsl*/ `
 
       float amb = 0.5 + 0.5 * dot(nor, vec3(0.0, 1.0, 0.0));
       col = vec3(0.2, 0.3, 0.4) * amb + vec3(0.8, 0.7, 0.5) * dif;
-    }
 
-    // gamma
-    col = sqrt(col);
-    vec3 tot = mix(background, foreground, col);
+      // gamma
+      col = sqrt(col);
+      if (length(col) > 0.01) {
+        tot = mix(shadow, mapBlocks(pos).xyz, col);
+      }
+    }
 
     gl_FragColor = vec4(tot, 1.0);
   }
@@ -230,7 +244,7 @@ const frag = glsl(/*glsl*/ `
 
 const randomComponent = () =>
   Random.pick([-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75]);
-const randomDepth = () => Random.pick([-0.5, 0, 0.5]);
+const randomDepth = () => Random.pick([-0.6, 0, 0.6]);
 const randomLocation = () => [
   randomComponent(),
   randomComponent(),
@@ -239,12 +253,16 @@ const randomLocation = () => [
 const randomShape = () => Random.rangeFloor(0, 4);
 
 const sketch = ({ gl }) => {
-  const { name, background, foreground } = colors();
+  const { name, background, foreground, fills, shadow } = colors();
   console.log({ name, background, foreground });
+
+  const randomColor = () => new THREE.Color(Random.pick(fills)).toArray();
 
   const blocks = new Array(8).fill(0).map(() => ({
     locations: new Array(8).fill(0).map(randomLocation),
     shape: randomShape(),
+    col: randomColor(),
+    size: Random.pick([0.0625, 0.125, 0.25, 0.5]),
   }));
 
   blocks.forEach((block) => {
@@ -257,57 +275,58 @@ const sketch = ({ gl }) => {
     uniforms: {
       background: new THREE.Color(background).toArray(),
       foreground: new THREE.Color(foreground).toArray(),
+      shadow: new THREE.Color(shadow).toArray(),
       time: ({ time }) => time,
       playhead: ({ playhead }) => playhead,
-      size: 0.25,
+      loopTime: ({ time }) => time % 1,
 
       'block1.loc': ({ time }) => blocks[0].locations[Math.floor(time)],
       'block1.nLoc': ({ time }) => blocks[0].locations[Math.floor(time) + 1],
       'block1.shape': blocks[0].shape,
-      'block1.nShape': 0,
-      'block1.col': new THREE.Color(foreground).toArray(),
+      'block1.col': blocks[0].col,
+      'block1.size': blocks[0].size,
 
       'block2.loc': ({ time }) => blocks[1].locations[Math.floor(time)],
       'block2.nLoc': ({ time }) => blocks[1].locations[Math.floor(time) + 1],
       'block2.shape': blocks[1].shape,
-      'block2.nShape': 0,
-      'block2.col': new THREE.Color(foreground).toArray(),
+      'block2.col': blocks[1].col,
+      'block2.size': blocks[1].size,
 
       'block3.loc': ({ time }) => blocks[2].locations[Math.floor(time)],
       'block3.nLoc': ({ time }) => blocks[2].locations[Math.floor(time) + 1],
       'block3.shape': blocks[2].shape,
-      'block3.nShape': 0,
-      'block3.col': new THREE.Color(foreground).toArray(),
+      'block3.col': blocks[2].col,
+      'block3.size': blocks[2].size,
 
       'block4.loc': ({ time }) => blocks[3].locations[Math.floor(time)],
       'block4.nLoc': ({ time }) => blocks[3].locations[Math.floor(time) + 1],
       'block4.shape': blocks[3].shape,
-      'block4.nShape': 0,
-      'block4.col': new THREE.Color(foreground).toArray(),
+      'block4.col': blocks[3].col,
+      'block4.size': blocks[3].size,
 
       'block5.loc': ({ time }) => blocks[4].locations[Math.floor(time)],
       'block5.nLoc': ({ time }) => blocks[4].locations[Math.floor(time) + 1],
       'block5.shape': blocks[4].shape,
-      'block5.nShape': 0,
-      'block5.col': new THREE.Color(foreground).toArray(),
+      'block5.col': blocks[4].col,
+      'block5.size': blocks[4].size,
 
       'block6.loc': ({ time }) => blocks[5].locations[Math.floor(time)],
       'block6.nLoc': ({ time }) => blocks[5].locations[Math.floor(time) + 1],
       'block6.shape': blocks[5].shape,
-      'block6.nShape': 0,
-      'block6.col': new THREE.Color(foreground).toArray(),
+      'block6.col': blocks[5].col,
+      'block6.size': blocks[5].size,
 
       'block7.loc': ({ time }) => blocks[6].locations[Math.floor(time)],
       'block7.nLoc': ({ time }) => blocks[6].locations[Math.floor(time) + 1],
       'block7.shape': blocks[6].shape,
-      'block7.nShape': 0,
-      'block7.col': new THREE.Color(foreground).toArray(),
+      'block7.col': blocks[6].col,
+      'block7.size': blocks[6].size,
 
       'block8.loc': ({ time }) => blocks[7].locations[Math.floor(time)],
       'block8.nLoc': ({ time }) => blocks[7].locations[Math.floor(time) + 1],
       'block8.shape': blocks[7].shape,
-      'block8.nShape': 0,
-      'block8.col': new THREE.Color(foreground).toArray(),
+      'block8.col': blocks[7].col,
+      'block8.size': blocks[7].size,
     },
   });
 };
