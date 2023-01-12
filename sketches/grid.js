@@ -24,50 +24,33 @@ const frag = glsl(/* glsl */ `
   uniform vec3 background;
   uniform vec3 foreground;
 
-  #define PI 3.14159265358979323846
-
-  vec2 rotate2D(vec2 _st, float _angle){
-    _st -= 0.5;
-    _st =  mat2(cos(_angle),-sin(_angle),
-                sin(_angle),cos(_angle)) * _st;
-    _st += 0.5;
-    return _st;
-  }
-
-  vec2 tile(vec2 _st, float _zoom){
-    _st *= _zoom;
-    return fract(_st);
-  }
-
-  float box(vec2 _st, vec2 _size, float _smoothEdges){
-    _size = vec2(0.5)-_size*0.5;
-    vec2 aa = vec2(_smoothEdges*0.5);
-    vec2 uv = smoothstep(_size,_size+aa,_st);
-    uv *= smoothstep(_size,_size+aa,vec2(1.0)-_st);
-    return uv.x*uv.y;
-  }
-
   void main() {
     vec2 p = (-1.0 + 2.0 * vUv);
     vec3 color = vec3(0.0);
 
-    // Divide the space in 4
-    p = tile(p, 4.);
+      p *= 3.0;      // Scale up the space by 3
+      p = fract(p); // Wrap around 1.0
 
-    // Use a matrix to rotate the space 45 degrees
-    color = mix(background, foreground, length(p));
+      // Now we have 9 spaces that go from 0-1
+      color = mix(background, foreground,  length(p));
 
     gl_FragColor = vec4(color,1.0);
   }
 `);
 
+// Your sketch, which simply returns the shader
 const sketch = ({ gl }) => {
   const { background, foreground } = colors();
 
+  // Create the shader and return it. It will be rendered by regl.
   return createShader({
+    // Pass along WebGL context
     gl,
+    // Specify fragment and/or vertex shader strings
     frag,
+    // Specify additional uniforms to pass down to the shaders
     uniforms: {
+      // Expose props from canvas-sketch
       time: ({ time }) => time,
       background,
       foreground,

@@ -8,8 +8,10 @@ const Color = require('canvas-sketch-util/color');
 
 // Setup our sketch
 const settings = {
+  dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
+  duration: 2,
 };
 
 // Your glsl code

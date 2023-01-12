@@ -15,8 +15,6 @@ const settings = {
 };
 
 const frag = glsl(/* glsl */ `
-  // Author @patriciogv - 2015
-  // https://thebookofshaders.com/09/
   precision highp float;
 
   uniform float time;
@@ -34,28 +32,44 @@ const frag = glsl(/* glsl */ `
     return _st;
   }
 
-  vec2 tile(vec2 _st, float _zoom){
-    _st *= _zoom;
-    return fract(_st);
+  float random (vec2 st) {
+    return fract(
+      sin(
+        dot(st.xy, vec2(12.989,78.233) * time)
+      ) * 43758.543
+    );
   }
 
-  float box(vec2 _st, vec2 _size, float _smoothEdges){
-    _size = vec2(0.5)-_size*0.5;
-    vec2 aa = vec2(_smoothEdges*0.5);
-    vec2 uv = smoothstep(_size,_size+aa,_st);
-    uv *= smoothstep(_size,_size+aa,vec2(1.0)-_st);
-    return uv.x*uv.y;
+   vec2 tilePattern(vec2 p, float index){
+
+    if(index <= 0.25) {
+      //  Rotate cell 1 by 90 degrees
+      p = rotate2D(p, PI*0.5);
+    } else if(index <= 0.5) {
+      //  Rotate cell 2 by -90 degrees
+      p = rotate2D(p, PI*-0.5);
+    } else if(index <= 0.75) {
+      //  Rotate cell 3 by 180 degrees
+      p = rotate2D(p, PI);
+    }
+
+    return p;
   }
 
   void main() {
     vec2 p = (-1.0 + 2.0 * vUv);
     vec3 color = vec3(0.0);
 
-    // Divide the space in 4
-    p = tile(p, 4.);
+    float resolution = 4.;
+    p *= resolution;
 
-    // Use a matrix to rotate the space 45 degrees
-    color = mix(background, foreground, length(p));
+    vec2 iPos = floor(p);  // integer
+    vec2 fPos = fract(p);  // fraction
+    p = tilePattern(fPos, random(iPos));
+
+    // step(st.x,st.y) just makes a b&w triangles
+    // but you can use whatever design you want.
+    color = mix(background, foreground, step(p.x, p.y));
 
     gl_FragColor = vec4(color,1.0);
   }
@@ -68,7 +82,7 @@ const sketch = ({ gl }) => {
     gl,
     frag,
     uniforms: {
-      time: ({ time }) => time,
+      time: ({ time }) => Math.floor(time * 6) / 6,
       background,
       foreground,
     },
@@ -76,7 +90,7 @@ const sketch = ({ gl }) => {
 };
 
 function colors(minContrast = 1) {
-  let palette = tome.get();
+  let palette = tome.get('cc232');
   if (!palette.background) palette = tome.get();
   console.log(palette.name);
 

@@ -55,7 +55,8 @@ const frag = glsl(/* glsl */ `
     p = tile(p, 4.);
 
     // Use a matrix to rotate the space 45 degrees
-    color = mix(background, foreground, length(p));
+    p = rotate2D(p,PI*0.25);
+    color = mix(background, foreground, box(p, vec2(0.7), 0.01));
 
     gl_FragColor = vec4(color,1.0);
   }
