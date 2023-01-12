@@ -12,8 +12,9 @@ const settings = {
   animate: true,
 };
 
-// Your glsl code
 const frag = glsl(/* glsl */ `
+  // Author @patriciogv - 2015
+  // https://thebookofshaders.com/09/
   precision highp float;
 
   uniform float time;
@@ -21,9 +22,28 @@ const frag = glsl(/* glsl */ `
   uniform vec3 background;
   uniform vec3 foreground;
 
-  void main () {
-    vec3 color = 0.5 + 0.5 * cos(time + vUv.xyx + background - foreground);
-    gl_FragColor = vec4(color, 1.0);
+  float circle(in vec2 _st, in float _radius){
+    vec2 l = _st-vec2(0.5);
+    return 1.- smoothstep(
+        _radius-(_radius*0.01),
+        _radius+(_radius*0.01),
+        dot(l,l)*4.0
+    );
+  }
+
+  void main() {
+    vec2 p = (-1.0 + 2.0 * vUv);
+    vec3 color = vec3(0.0);
+
+      p *= 3.0;      // Scale up the space by 3
+      p = fract(p); // Wrap around 1.0
+
+      // Now we have 9 spaces that go from 0-1
+
+      color = mix(background, foreground,  length(p));
+      //color = vec3(circle(st,0.5));
+
+    gl_FragColor = vec4(color,1.0);
   }
 `);
 
