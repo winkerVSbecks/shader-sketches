@@ -69,7 +69,8 @@ const frag = glsl(/* glsl */ `
 
     // step(st.x,st.y) just makes a b&w triangles
     // but you can use whatever design you want.
-    color = mix(background, foreground, step(p.x, p.y));
+    // color = mix(background, foreground, step(p.x, p.y));
+    color = mix(background, foreground, length(floor(fract(p) + 0.5)));
 
     gl_FragColor = vec4(color,1.0);
   }
