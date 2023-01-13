@@ -40,24 +40,6 @@ const frag = glsl(/* glsl */ `
     );
   }
 
-  float stripe(vec2 p, float tiling, float direction) {
-    vec2 pos;
-    // Blend the direction between x and y
-	  pos.x = mix(p.x, p.y, direction);
-	  pos.y = mix(p.y, 1.0 - p.x, direction);
-	  pos.x *= tiling;
-
-	  // return floor(fract(pos.x) + 0.5);
-    float v = floor(fract(pos.x) + 0.5);
-	  return pos.x < tiling * 0.5 ?
-        pos.x < tiling * 0.25 ?
-          floor(fract(pos.x) + 0.5)
-          : floor(fract(pos.x) + 0.5) - 0.2
-        : pos.x < tiling * 0.75 ?
-            1.2 - v
-            : 1. - v;
-  }
-
   float aastep(float threshold, float value) {
     #ifdef GL_OES_standard_derivatives
       float afwidth = length(vec2(dFdx(value), dFdy(value))) * 0.70710678118654757;
@@ -78,10 +60,12 @@ const frag = glsl(/* glsl */ `
                       vec2(dot(pq1,pq1), s*(v1.x*e1.y-v1.y*e1.x))),
                       vec2(dot(pq2,pq2), s*(v2.x*e2.y-v2.y*e2.x)));
     float dist = -sqrt(d.x)*sign(d.y);
+
     // dist = sign(dist) * aastep(0.00001, abs(dist));
     dist = sign(dist) * aastep(0.01, abs(dist));
-
     return vec4(dist < 0.0 ? color : background, dist);
+
+    // return vec4(dist < 0.1 ? color : background, dist);
   }
 
   vec4 sqQuad(vec2 p, vec2 p0, vec2 p1, vec2 p2, vec2 p3, vec3 color) {
