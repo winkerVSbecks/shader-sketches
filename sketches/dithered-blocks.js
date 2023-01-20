@@ -17,7 +17,7 @@ const settings = {
 const frag = glsl(/* glsl */ `
   precision highp float;
 
-  #define PIXEL_SIZE 4.0
+  #define PIXEL_SIZE 3.0
   #define PI 3.14159265359
 
   uniform float time;
@@ -38,40 +38,11 @@ const frag = glsl(/* glsl */ `
     vec3 p4;
   };
 
-  Block oBlock = Block(
-    vec3(0.25, 0.25, 0.),
-    vec3(-0.25, 0.25, 0.),
-    vec3(0.25, -0.25, 0.),
-    vec3(-0.25, -0.25, 0.)
-  );
-
-  Block zBlock = Block(
-    vec3(0.0, 0.25, 0.0),
-    vec3(-0.5, 0.25, 0.0),
-    vec3(0.5, -0.25, 0.0),
-    vec3(0.0, -0.25, 0.0)
-  );
-
-  Block tBlock = Block(
-    vec3(0.0, 0.25, 0.0),
-    vec3(-0.5, 0.25, 0.0),
-    vec3(0.5, 0.25, 0.0),
-    vec3(0.0, -0.25, 0.0)
-  );
-
-  Block lBlock = Block(
-    vec3(0.0, 0.25, 0.0),
-    vec3(-0.5, 0.25, 0.0),
-    vec3(0.5, 0.25, 0.0),
-    vec3(-0.5, -0.25, 0.0)
-  );
-
-  Block iBlock = Block(
-    vec3(0.25, 0.0, 0.0),
-    vec3(-0.25, 0.0, 0.0),
-    vec3(0.75, 0.0, 0.0),
-    vec3(-0.75, 0.0, 0.0)
-  );
+  uniform Block oBlock;
+  uniform Block zBlock;
+  uniform Block tBlock;
+  uniform Block lBlock;
+  uniform Block iBlock;
 
   vec3 p1 = iBlock.p1;
   vec3 p2 = iBlock.p2;
@@ -113,12 +84,8 @@ const frag = glsl(/* glsl */ `
     return mat2(cos(a),sin(a),-sin(a),cos(a));
   }
 
-
-  float EaseOutQuad(float x) {
-    return 1.0 - (1.0-x) * (1.0 -x );
-  }
-
   float EaseOutQuart(float x) { return 1.0 - pow(1.0 -x, 4.0); }
+
 
   float mapRange(float value, float min1, float max1, float min2, float max2) {
     return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
@@ -155,17 +122,14 @@ const frag = glsl(/* glsl */ `
   }
 
   float de(vec3 pos) {
-    float scale = 8.;
+    float scale = 6.;
     pos = pos/scale;
     float d = 1e10;
     float r = 0.0125;
 
-    float angle = playhead * 2. * PI;
-    pos.xyz = (rotation3d(vec3(0., 1., 0.), angle) * vec4(pos, 1.0)).xyz;
+    // float angle = playhead * 2. * PI;
+    // pos.xyz = (rotation3d(vec3(0., 1., 0.), angle) * vec4(pos, 1.0)).xyz;
     d = block(pos, r);
-
-    d += (sin(pos.x*3.0424+time * 1.9318)*.5+.5)*0.3 * 0.25;
-    d += (sin(pos.y*2.0157+time * 1.5647)*.5+.5)*0.4 * 0.25;
 
     return d * scale;
   }
@@ -257,22 +221,37 @@ const frag = glsl(/* glsl */ `
         // do some whatever background with dithering as well
         vec2 pos = gl_FragCoord.xy - resolution.xy * 0.5;
 
-        // vec2 dir = vec2(0.0, 1.0)*rot(sin(time*0.4545)*0.112);
-        // float value = sin(dot(pos, dir)*0.048-time*1.412)*0.5+0.5;
+        vec2 dir = vec2(0.0, 1.0)*rot(sin(time*0.4545)*0.112);
+        float value = sin(dot(pos, dir)*0.048-time*1.412)*0.5+0.5;
 
-        vec2 dir = vec2(0.0, 1.0) * rot(0.112);
-        float value = sin(dot(pos, dir) * 0.0048 - time*1.412)*0.5 + 0.5;
+        // vec2 dir = vec2(0.0, 1.0) * rot(0.112);
+        // float value = sin(dot(pos, dir) * 0.02 - time*1.412)*0.5 + 0.5;
 
-        // gl_FragColor = vec4(vec3(getValue(value, pos)), 1.0);
-        gl_FragColor = vec4(0.0);
+        gl_FragColor = vec4(vec3(getValue(value, pos)), 1.0);
+        gl_FragColor = vec4(1.0);
       }
     }
   }
 `);
 
-// Your sketch, which simply returns the shader
+const randomComponent = () => Random.pick([-1, -0.5, 0, 0.5, 1]);
+const randomBlock = () => ({
+  p1: [randomComponent(), randomComponent(), 0],
+  p2: [randomComponent(), randomComponent(), 0],
+  p3: [randomComponent(), randomComponent(), 0],
+  p4: [randomComponent(), randomComponent(), 0],
+});
+
 const sketch = ({ gl }) => {
   const { background, foreground } = colors();
+
+  const blocks = {
+    oBlock: randomBlock(),
+    zBlock: randomBlock(),
+    tBlock: randomBlock(),
+    lBlock: randomBlock(),
+    iBlock: randomBlock(),
+  };
 
   return createShader({
     gl,
@@ -285,6 +264,30 @@ const sketch = ({ gl }) => {
       boxSize: [0.25, 0.25, 0.25],
       background,
       foreground,
+      'oBlock.p1': blocks.oBlock.p1,
+      'oBlock.p2': blocks.oBlock.p2,
+      'oBlock.p3': blocks.oBlock.p3,
+      'oBlock.p4': blocks.oBlock.p4,
+
+      'zBlock.p1': blocks.zBlock.p1,
+      'zBlock.p2': blocks.zBlock.p2,
+      'zBlock.p3': blocks.zBlock.p3,
+      'zBlock.p4': blocks.zBlock.p4,
+
+      'tBlock.p1': blocks.tBlock.p1,
+      'tBlock.p2': blocks.tBlock.p2,
+      'tBlock.p3': blocks.tBlock.p3,
+      'tBlock.p4': blocks.tBlock.p4,
+
+      'lBlock.p1': blocks.lBlock.p1,
+      'lBlock.p2': blocks.lBlock.p2,
+      'lBlock.p3': blocks.lBlock.p3,
+      'lBlock.p4': blocks.lBlock.p4,
+
+      'iBlock.p1': blocks.iBlock.p1,
+      'iBlock.p2': blocks.iBlock.p2,
+      'iBlock.p3': blocks.iBlock.p3,
+      'iBlock.p4': blocks.iBlock.p4,
     },
   });
 };
