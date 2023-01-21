@@ -42,8 +42,8 @@ const frag = glsl(/* glsl */ `
 
     vec3 color = vec3(1.0);
 
-    for(int i = -2; i < 9; i++) {
-		  float t = 1. * float(i) / 8. + time/8.;
+    for(int i = 1; i < 10; i++) {
+		  float t = 1. * float(i) / 8. - time/8.;
     	vec2 bl = step(vec2(0.02), st - vec2(t));
 	    float pct = bl.x * bl.y;
 	    color -= st.x < t || st.y < t  ? vec3(0.) : 1. - vec3(pct * vec3(1.0));
@@ -71,7 +71,7 @@ const sketch = ({ gl }) => {
 };
 
 function colors(minContrast = 1) {
-  let palette = tome.get();
+  let palette = tome.get('miradors');
   if (!palette.background) palette = tome.get();
   console.log(palette.name);
 
