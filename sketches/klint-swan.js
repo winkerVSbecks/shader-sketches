@@ -10,7 +10,7 @@ const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 16,
+  duration: 8 * 3,
 };
 
 const frag = glsl(/* glsl */ `
@@ -76,9 +76,8 @@ const frag = glsl(/* glsl */ `
     vec2 p = (-1.0 + 2.0 * vUv);
 
     vec3 color;
-    // float t = easeInOutCubic(linearstep(0.0, 0.9, fract(time)));
-    float ta = mod(-1.3 + time, 2.);
-    float t = easeInOutCubic(linearstep(0.0, 0.5, ta));
+    float t = mod(-2.5 + time, 3.);
+    // float t = easeInOutCubic(linearstep(0.0, 0.5, fract(time)));
 
     if (p.x < 0.) {
       // p.x = p.x - (1. - 1. * t);
@@ -88,8 +87,8 @@ const frag = glsl(/* glsl */ `
       color = comp(p, rightC1, rightC2, rightC3, rightC4);
     }
 
-    float v0 = 1.0 - step(easeInOutCubic(linearstep(0.0, 0.7, ta)), vUv.x);
-    float v1 = 1.0 - step(easeInOutCubic(linearstep(0.5, 1.0, ta)), vUv.x);
+    float v0 = 1.0 - step(easeInOutCubic(linearstep(0.0, 0.7, t)), vUv.x);
+    float v1 = 1.0 - step(easeInOutCubic(linearstep(0.5, 1.0, t)), vUv.x);
     color = mix(color, foreground, v0 - v1);
 
     color = color + 0.125 * random(vUv);
@@ -110,14 +109,14 @@ const sketch = ({ gl, duration }) => {
       time: ({ time }) => time,
       background,
       foreground,
-      leftC1: ({ time }) => state[Math.floor(time / 2)].left[0],
-      leftC2: ({ time }) => state[Math.floor(time / 2)].left[1],
-      leftC3: ({ time }) => state[Math.floor(time / 2)].left[2],
-      leftC4: ({ time }) => state[Math.floor(time / 2)].left[3],
-      rightC1: ({ time }) => state[Math.floor(time / 2)].right[0],
-      rightC2: ({ time }) => state[Math.floor(time / 2)].right[1],
-      rightC3: ({ time }) => state[Math.floor(time / 2)].right[2],
-      rightC4: ({ time }) => state[Math.floor(time / 2)].right[3],
+      leftC1: ({ time }) => state[Math.floor(time / 3)].left[0],
+      leftC2: ({ time }) => state[Math.floor(time / 3)].left[1],
+      leftC3: ({ time }) => state[Math.floor(time / 3)].left[2],
+      leftC4: ({ time }) => state[Math.floor(time / 3)].left[3],
+      rightC1: ({ time }) => state[Math.floor(time / 3)].right[0],
+      rightC2: ({ time }) => state[Math.floor(time / 3)].right[1],
+      rightC3: ({ time }) => state[Math.floor(time / 3)].right[2],
+      rightC4: ({ time }) => state[Math.floor(time / 3)].right[3],
     },
   });
 };
