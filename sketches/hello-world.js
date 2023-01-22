@@ -43,6 +43,7 @@ const sketch = ({ gl }) => {
     // Specify additional uniforms to pass down to the shaders
     uniforms: {
       // Expose props from canvas-sketch
+      resolution: ({ width, height }) => [width, height],
       time: ({ time }) => time,
       background,
       foreground,
