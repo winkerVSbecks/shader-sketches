@@ -178,14 +178,12 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
     vec2 p = f(uv);
 
-
     vec3 col = ComplexColor(p);
 
     vec2 dr = CxPolarize(p);
     vec2 dc = smoothstep(2.*0.01,0.01,dr);
     float val = dot(dc, vec2(1));
     col = .5 + .47*cos(6.2831*val + vec3(0, 1, 2));
-
 
     // Output to screen
     fragColor = vec4(col,1.0);
