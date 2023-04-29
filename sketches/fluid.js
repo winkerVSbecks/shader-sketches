@@ -30,22 +30,10 @@ const frag = glsl(/*glsl*/ `
   const float fluid_speed     = 108.0;  // Drives speed, higher number will make it slower.
   const float color_intensity = 0.8;
 
-  vec3 plasmaQuintic(float x) {
-    vec4 x1 = vec4( 1.0, x, x * x, x * x * x ); // 1 x x2 x3
-    vec4 x2 = x1 * x1.w * x; // x4 x5 x6 x7
-
-    return vec3(
-      dot( x1.xyzw, vec4( +0.063861086, +1.992659096, -1.023901152, -0.490832805 ) ) + dot( x2.xy, vec2( +1.308442123, -0.914547012 ) ),
-      dot( x1.xyzw, vec4( +0.049718590, -0.791144343, +2.892305078, +0.811726816 ) ) + dot( x2.xy, vec2( -4.686502417, +2.717794514 ) ),
-      dot( x1.xyzw, vec4( +0.513275779, +1.580255060, -5.164414457, +4.559573646 ) ) + dot( x2.xy, vec2( -1.916810682, +0.570638854 ) )
-    );
-  }
-
   vec3 hsv2rgb(float h,float s,float v) {
     return mix(vec3(1.),clamp((abs(fract(h+vec3(3.,2.,1.)/3.)*6.-3.)-1.),0.,1.),s)*v;
     // vec3 c = mix(vec3(1.),clamp((abs(fract(h+vec3(3.,2.,1.)/3.)*6.-3.)-1.),0.,1.),s)*v;
     // return .5 + .47*cos(6.2831* length(c) + vec3(0, 1, 2));
-    // return plasmaQuintic(length(c * playhead));
   }
 
   void main() {
