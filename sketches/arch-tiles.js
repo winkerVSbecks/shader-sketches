@@ -41,27 +41,6 @@ const frag = glsl(/* glsl */ `
     );
   }
 
-  vec2 tilePattern(vec2 p, float index){
-    p = rotate2D(p, PI *-0.5);
-
-    // p = rotate2D(p, PI*0.5);
-    // p = rotate2D(p, PI *-0.5);
-    // p = rotate2D(p, PI);
-
-    // if(index <= 0.25) {
-    //   //  Rotate cell 1 by 90 degrees
-    //   p = rotate2D(p, PI*0.5);
-    // } else if(index <= 0.5) {
-    //   //  Rotate cell 2 by -90 degrees
-    //   p = rotate2D(p, PI*-0.5);
-    // } else if(index <= 0.75) {
-    //   //  Rotate cell 3 by 180 degrees
-    //   p = rotate2D(p, PI);
-    // }
-
-    return p;
-  }
-
   void main() {
     vec2 u = vUv - vec2(0, -.25);
     vec2 p = rotate2D(u, PI * 0.25);
