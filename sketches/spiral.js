@@ -41,53 +41,32 @@ const frag = glsl(/* glsl */ `
     );
   }
 
-  vec2 tilePattern(vec2 p, float index){
-    p = rotate2D(p, PI *-0.25);
+  float easeInOutCubic(float t) {
+    if ((t *= 2.0) < 1.0) {
+        return 0.5 * t * t * t;
+    } else {
+        return 0.5 * ((t -= 2.0) * t * t + 2.0);
+    }
+  }
 
-    // p = rotate2D(p, PI*0.5);
-    // p = rotate2D(p, PI *-0.5);
-    // p = rotate2D(p, PI);
-
-    // if(index <= 0.25) {
-    //   //  Rotate cell 1 by 90 degrees
-    //   p = rotate2D(p, PI*0.5);
-    // } else if(index <= 0.5) {
-    //   //  Rotate cell 2 by -90 degrees
-    //   p = rotate2D(p, PI*-0.5);
-    // } else if(index <= 0.75) {
-    //   //  Rotate cell 3 by 180 degrees
-    //   p = rotate2D(p, PI);
-    // }
-
-    return p;
+  float linearstep(float begin, float end, float t) {
+    return clamp((t - begin) / (end - begin), 0.0, 1.0);
   }
 
   void main() {
     vec2 u = vUv - vec2(0, -.25);
-    vec2 p = rotate2D(u, PI * 2. * time);
+    vec2 p = rotate2D(u, PI * .5);
     p/=dot(p, p);
 
     vec3 color = vec3(0.0);
 
-    float resolution = 24.0;
+    float resolution = 12.0;
     p *= resolution;
+    p = fract(p);
 
-    vec2 iPos = floor(p);  // integer
-    vec2 fPos = fract(p);  // fraction
-    // p = tilePattern(fPos, random(iPos));
-    // p = tilePattern(fPos, length(iPos));
-    // if (time < 1.) {
-    //   fPos.x += 1. * time;
-    // } else {
-    //   fPos.x -= 1. * (time - 1.);
-    // }
-    // fPos = mix(vec2(0.), fPos, time);
-    // p = tilePattern(fPos, time < 1. ? .25 : 0.5);
-
-    fPos.x += 1. * time;
-    p = tilePattern(fPos, .125);
-
-    color = mix(background, foreground, step(p.x, p.y));
+    float v0 = 1.0 - step(easeInOutCubic(linearstep(0.0, 0.7, time)), p.x);
+    float v1 = 1.0 - step(easeInOutCubic(linearstep(0.3, 1.0, time)), p.x);
+    color = mix(foreground, background, v0 - v1);
 
     gl_FragColor = vec4(color,1.0);
   }
@@ -100,7 +79,7 @@ const sketch = ({ gl }) => {
     gl,
     frag,
     uniforms: {
-      // time: ({ time }) => Math.floor(time * 6) / 6,
+      // time: ({ playhead }) => lerpFrames([0, 1, 2, 3, 4], playhead),
       time: ({ playhead }) => lerpFrames([0, 1], playhead),
       background,
       foreground,
@@ -109,7 +88,7 @@ const sketch = ({ gl }) => {
 };
 
 function colors(minContrast = 1) {
-  let palette = tome.get('tsu_harutan');
+  let palette = tome.get();
   if (!palette.background) palette = tome.get();
   console.log(palette.name);
 
@@ -124,8 +103,8 @@ function colors(minContrast = 1) {
   const foreground = Random.pick(colors);
 
   return {
-    background: new THREE.Color('#000' /* background */).toArray(),
-    foreground: new THREE.Color('#fff' /* foreground */).toArray(),
+    background: new THREE.Color(background).toArray(),
+    foreground: new THREE.Color(foreground).toArray(),
   };
 }
 

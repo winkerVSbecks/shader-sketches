@@ -101,7 +101,7 @@ const sketch = ({ gl }) => {
 };
 
 function colors(minContrast = 1) {
-  let palette = tome.get('tsu_harutan');
+  let palette = tome.get();
   if (!palette.background) palette = tome.get();
   console.log(palette.name);
 
