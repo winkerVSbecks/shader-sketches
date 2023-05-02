@@ -27,10 +27,6 @@ const frag = glsl(/* glsl */ `
 
   float groutWidth = 0.01;
 
-  float smoothedge(float v) {
-    return smoothstep(0.0, 1.0 / resolution.x, v);
-  }
-
   float pattern(float y) {
     if (y <= 0.4) { return 1.; }
     else if (y > 0.4 && y <= 0.6) { return 0.; }
