@@ -26,6 +26,7 @@ const frag = glsl(/*glsl*/ `
   uniform float mixBaseAndIridescent;
   uniform vec3 tint;
   uniform vec3 rotationAxis;
+  uniform int shapeType;
 
   vec2 doModel(vec3 p);
 
@@ -35,7 +36,16 @@ const frag = glsl(/*glsl*/ `
   #pragma glslify: normal = require('glsl-sdf-normal', map = doModel)
   #pragma glslify: camera = require('glsl-camera-ray')
   #pragma glslify: square   = require('glsl-square-frame')
+  #pragma glslify: sdSphere = require('glsl-sdf-primitives/sdSphere')
+  #pragma glslify: sdBox = require('glsl-sdf-primitives/sdBox')
+  #pragma glslify: udRoundBox = require('glsl-sdf-primitives/udRoundBox')
+  #pragma glslify: sdPlane = require('glsl-sdf-primitives/sdPlane')
   #pragma glslify: sdTorus = require('glsl-sdf-primitives/sdTorus')
+  #pragma glslify: sdCappedCone = require('glsl-sdf-primitives/sdCappedCone')
+  #pragma glslify: sdCappedCylinder = require('glsl-sdf-primitives/sdCappedCylinder')
+  #pragma glslify: sdCapsule = require('glsl-sdf-primitives/sdCapsule')
+  #pragma glslify: sdHexPrism = require('glsl-sdf-primitives/sdHexPrism')
+  #pragma glslify: sdTriPrism = require('glsl-sdf-primitives/sdTriPrism')
   #pragma glslify: sdCappedCylinder = require('glsl-sdf-primitives/sdCappedCylinder')
   #pragma glslify: combine = require('glsl-combine-smooth')
   #pragma glslify: blinnPhongSpec = require('glsl-specular-blinn-phong')
@@ -50,6 +60,26 @@ const frag = glsl(/*glsl*/ `
 
   float opU(float d1, float d2) {
     return min(d1,d2);
+  }
+
+  float shape(vec3 p) {
+    if (shapeType == 0) {
+      return sdBox(p, vec3(0.125));
+    } else if (shapeType == 1) {
+      return udRoundBox(p, vec3(0.1), 0.0625);
+    } else if (shapeType == 2) {
+      return sdTorus(p, vec2(0.125, .0625));
+    } else if (shapeType == 3) {
+      return sdCappedCone(p, vec3(0.25, 0.125, 0.25));
+    } else if (shapeType == 4) {
+      return sdCappedCylinder(p, vec2(0.125, 0.125));
+    } else if (shapeType == 5) {
+      return sdCapsule(p, vec3(0, -.1, 0), vec3(0, .1, 0), 0.125);
+    } else if (shapeType == 6) {
+      return sdHexPrism(p, vec2(0.125));
+    } else if (shapeType == 7) {
+      return sdTriPrism(p, vec2(0.125));
+    }
   }
 
   vec2 doModel(vec3 p) {
@@ -68,11 +98,7 @@ const frag = glsl(/*glsl*/ `
         q.xyz = rotate3d(q, rotationAxis, rotation);
         q = opBend(bend, q);
 
-        float cap = sdTorus(q, vec2(0.125, .0625));
-        float stem = sdCappedCylinder(q + vec3(0, 0.1, 0), vec2(0.0625, .125));
-        float mushroom = combine(cap, stem, 0.1);
-        // float mushroom = opU(cap, stem);
-        d = min(d, mushroom);
+        d = min(d, shape(q));
       }
     }
 
@@ -123,7 +149,6 @@ const frag = glsl(/*glsl*/ `
       // Determine the point of collision
       vec3 pos = rayOrigin + rayDirection * collision.x;
       vec3 nor = normal(pos);
-      // color = nor * 0.5 + 0.5;
 
       // From Thomas Hooper's https://www.shadertoy.com/view/llcXWM
       vec3 eyeDirection = normalize(rayOrigin - pos);
@@ -172,6 +197,7 @@ const sketch = ({ gl }) => {
     tint: { r: 0.05, g: 0.0, b: 0.97 },
     specular: false,
     mix: 0.7,
+    shape: 2,
   };
 
   const pane = new Pane();
@@ -181,6 +207,18 @@ const sketch = ({ gl }) => {
   pane.addInput(PARAMS, 'mix', { min: 0, max: 1, step: 0.01 });
   pane.addInput(PARAMS, 'tint', {
     color: { type: 'float' },
+  });
+  pane.addInput(PARAMS, 'shape', {
+    options: {
+      Box: 0,
+      RoundBox: 1,
+      Torus: 2,
+      CappedCone: 3,
+      CappedCylinder: 4,
+      Capsule: 5,
+      HexPrism: 6,
+      TriPrism: 7,
+    },
   });
   pane.addInput(PARAMS, 'rotate camera', {});
   pane.addInput(PARAMS, 'specular', {});
@@ -199,6 +237,7 @@ const sketch = ({ gl }) => {
       addSpecular: () => PARAMS.specular,
       rotateCamera: () => PARAMS['rotate camera'],
       mixBaseAndIridescent: () => PARAMS.mix,
+      shapeType: () => PARAMS.shape,
       tint: () => Object.values(PARAMS.tint),
       resolution: ({ width, height }) => [width, height],
       time: ({ time }) => time,
