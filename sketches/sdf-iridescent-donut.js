@@ -1,6 +1,6 @@
 const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
-const { lerpFrames } = require('canvas-sketch-util/math');
+const Random = require('canvas-sketch-util/random');
 const glsl = require('glslify');
 import { Pane } from 'tweakpane';
 
@@ -21,8 +21,11 @@ const frag = glsl(/*glsl*/ `
   uniform vec3 cameraPos;
   uniform vec3 lightPos;
   uniform float lensLength;
-  uniform float roughness;
-  uniform bool rotate;
+  uniform bool rotateCamera;
+  uniform bool addSpecular;
+  uniform float mixBaseAndIridescent;
+  uniform vec3 tint;
+  uniform vec3 rotationAxis;
 
   vec2 doModel(vec3 p);
 
@@ -38,7 +41,7 @@ const frag = glsl(/*glsl*/ `
   #pragma glslify: rotate3d = require('glsl-rotate/rotate')
 
   vec2 doModel(vec3 p) {
-    p = rotate3d(p, vec3(1.0, 0.0, 0.0), PI * 2. * playhead);
+    p = rotate3d(p, rotationAxis, PI * 2. * playhead);
     float d = sdTorus(p, vec2(0.5, .25));
     return vec2(d, 0.0);
   }
@@ -61,11 +64,20 @@ const frag = glsl(/*glsl*/ `
     return gamma(linearRGB, 1.0 / GAMMA);
   }
 
+  vec3 sky(vec3 v) {
+    vec3 grad_a = vec3(0.9, 0.85, 0.7);
+    vec3 grad_b = vec3(0.5, 0.0, 1.0) * 0.5;
+
+    float grad_t = v.y * 0.5 + 0.5;
+
+    return mix(grad_b, grad_a, grad_t);
+  }
+
   void main() {
     vec3 color = vec3(0.0);
     vec3 bg = vec3(0.);
     // Bootstrap a raytracing scene
-    float cameraAngle  = rotate ? 2. * PI * playhead : 0.0;
+    float cameraAngle  = rotateCamera ? 2. * PI * playhead : 0.0;
     vec3  rayOrigin    = cameraPos * vec3(sin(cameraAngle), 1.0, cos(cameraAngle));
     vec3  rayTarget    = vec3(0, 0, 0);
     vec2  screenPos    = square(resolution.xy);
@@ -78,27 +90,33 @@ const frag = glsl(/*glsl*/ `
       // Determine the point of collision
       vec3 pos = rayOrigin + rayDirection * collision.x;
       vec3 nor = normal(pos);
-      color = nor * 0.5 + 0.5;
+      // color = nor * 0.5 + 0.5;
 
+      // From Thomas Hooper's https://www.shadertoy.com/view/llcXWM
       vec3 eyeDirection = normalize(rayOrigin - pos);
       vec3 lightDirection = normalize(lightPos - pos);
 
+      // basic blinn phong lighting
       float power = blinnPhongSpec(lightDirection, eyeDirection, nor, 0.5);
-      color = vec3(power, power, power) * color; // * vec3(0.80,0.33,0.42);
+      vec3 baseColor = vec3(power, power, power) * tint;
 
-      vec3 ref = reflect(rayDirection, nor);
+      // iridescent lighting
+      vec3 reflection = reflect(rayDirection, nor);
       vec3 dome = vec3(0, 1, 0);
 
       vec3 perturb = sin(pos * 10.);
-      color = color * vec3(0.25) + spectrum( dot(nor + perturb * .05, eyeDirection) * 2.);
+      color = spectrum( dot(nor + perturb * .05, eyeDirection) * 2.);
 
-      float specular = clamp(dot(ref, lightDirection), 0., 1.);
+      float specular = clamp(dot(reflection, lightDirection), 0., 1.);
       specular = pow((sin(specular * 20. - 3.) * .5 + .5) + .1, 32.) * specular;
       specular *= .1;
-      specular += pow(clamp(dot(ref, lightDirection), 0., 1.) + .3, 8.) * .1;
+      specular += pow(clamp(dot(reflection, lightDirection), 0., 1.) + .3, 8.) * .1;
 
       float shadow = pow(clamp(dot(nor, dome) * .5 + 1.2, 0., 1.), 3.);
-      color = color * shadow + specular;
+      color = color * shadow + (addSpecular ? specular : 0.0);
+
+      // mix blinn phong lighting and iridescent lighting
+      color = mix(baseColor, color, mixBaseAndIridescent);
 
       float near = 2.8;
       float far = 8.;
@@ -114,27 +132,41 @@ const frag = glsl(/*glsl*/ `
 
 const sketch = ({ gl }) => {
   const PARAMS = {
-    rotate: true,
     camera: { x: 3.5, y: 3, z: 3.5 },
     light: { x: 1, y: 1, z: 1 },
     lensLength: 2,
-    roughness: 0.8,
+    'rotate camera': true,
+    tint: { r: 0.8, g: 0.33, b: 0.42 },
+    specular: true,
+    mix: 1.0,
   };
 
   const pane = new Pane();
-  pane.addInput(PARAMS, 'rotate', {});
   pane.addInput(PARAMS, 'camera', {});
   pane.addInput(PARAMS, 'light', {});
-  pane.addInput(PARAMS, 'lensLength', {});
+  pane.addInput(PARAMS, 'lensLength', { min: 0, max: 5, step: 0.1 });
+  pane.addInput(PARAMS, 'mix', { min: 0, max: 1, step: 0.01 });
+  pane.addInput(PARAMS, 'tint', {
+    color: { type: 'float' },
+  });
+  pane.addInput(PARAMS, 'rotate camera', {});
+  pane.addInput(PARAMS, 'specular', {});
+
+  const rotationAxis = Random.quaternion();
+  rotationAxis.pop();
 
   return createShader({
     gl,
     frag,
     uniforms: {
-      rotate: () => PARAMS.rotate,
+      rotationAxis,
       cameraPos: () => Object.values(PARAMS.camera),
       lightPos: () => Object.values(PARAMS.light),
       lensLength: () => PARAMS.lensLength,
+      addSpecular: () => PARAMS.specular,
+      rotateCamera: () => PARAMS['rotate camera'],
+      mixBaseAndIridescent: () => PARAMS.mix,
+      tint: () => Object.values(PARAMS.tint),
       resolution: ({ width, height }) => [width, height],
       time: ({ time }) => time,
       playhead: ({ playhead }) => playhead,
