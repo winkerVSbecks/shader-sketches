@@ -26,7 +26,6 @@ const frag = glsl(/*glsl*/ `
   uniform bool rotateCamera;
   uniform bool addSpecular;
   uniform float mixBaseAndIridescent;
-  uniform vec3 tint;
   uniform vec2 mouse;
   uniform samplerCube envMap;
 
@@ -44,7 +43,6 @@ const frag = glsl(/*glsl*/ `
   #pragma glslify: normal = require('glsl-sdf-normal', map = doModel)
   #pragma glslify: camera = require('glsl-camera-ray')
   #pragma glslify: square   = require('glsl-square-frame')
-  #pragma glslify: blinnPhongSpec = require('glsl-specular-blinn-phong')
   #pragma glslify: rotate = require('glsl-rotate/rotate')
 
   // Using some magic folding stuff described here: https://youtu.be/0RWaR7zApEo?t=181
@@ -109,10 +107,6 @@ const frag = glsl(/*glsl*/ `
     vec3  rayOrigin    = cameraPos * vec3(sin(cameraAngle), 1.0, cos(cameraAngle));
     rayOrigin.yz = rotate(rayOrigin.yz, -mouse.y * PI + 1.);
     rayOrigin.xz = rotate(rayOrigin.xz, -mouse.x * PI * 2.);
-    // if (rotateCamera) {
-    //   rayOrigin.xz = rotate(rayOrigin.xz, cameraAngle);
-    //   rayOrigin.yz = rotate(rayOrigin.xz, cameraAngle);
-    // }
     vec3  rayTarget    = vec3(0, 0, 0);
     vec2  screenPos    = square(resolution.xy);
     vec3  rayDirection = camera(rayOrigin, rayTarget, screenPos, lensLength);
@@ -192,8 +186,10 @@ const frag = glsl(/*glsl*/ `
       float shadow = pow(clamp(dot(nor, dome) * .5 + 1.2, 0., 1.), 3.);
       vec3 iridescentColor = color * shadow + (addSpecular ? specular : 0.0);
 
+      // mix it manually
       // color = mix(refractionColor, iridescentColor, mixBaseAndIridescent);
 
+      // mix it with optical distance
       color = refractionColor;
       float optDist1 = 1. - exp(collisionIn.x * dens);
       color = mix(refractionColor, iridescentColor, optDist1);
@@ -226,10 +222,8 @@ const sketch = async ({ gl, canvas }) => {
     light: { x: 1, y: 1, z: 1 },
     lensLength: 2,
     spin: true,
-    tint: { r: 0.05, g: 0.0, b: 0.97 },
     specular: false,
     mix: 0.7,
-    animateTint: true,
   };
 
   const pane = new Pane();
@@ -237,12 +231,8 @@ const sketch = async ({ gl, canvas }) => {
   pane.addInput(PARAMS, 'light', {});
   pane.addInput(PARAMS, 'lensLength', { min: 0, max: 5, step: 0.1 });
   pane.addInput(PARAMS, 'mix', { min: 0, max: 1, step: 0.01 });
-  pane.addInput(PARAMS, 'tint', {
-    color: { type: 'float' },
-  });
   pane.addInput(PARAMS, 'spin', {});
   pane.addInput(PARAMS, 'specular', {});
-  pane.addInput(PARAMS, 'animateTint', {});
 
   const mouse = createMouse(canvas);
 
@@ -256,18 +246,6 @@ const sketch = async ({ gl, canvas }) => {
       addSpecular: () => PARAMS.specular,
       rotateCamera: () => PARAMS['spin'],
       mixBaseAndIridescent: () => PARAMS.mix,
-      tint: ({ playhead }) =>
-        PARAMS.animateTint
-          ? lerpFrames(
-              [
-                [1, 0, 0],
-                [0, 1, 0],
-                [0, 0, 1],
-                [1, 0, 0],
-              ],
-              playhead
-            )
-          : Object.values(PARAMS.tint),
       resolution: ({ width, height }) => [width, height],
       time: ({ time }) => time,
       playhead: ({ playhead }) => playhead,
