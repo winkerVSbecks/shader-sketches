@@ -2,6 +2,7 @@ const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
 const glsl = require('glslify');
 const createMouse = require('../utils/mouse');
+const load = require('load-asset');
 import { lerpFrames } from 'canvas-sketch-util/math';
 import { Pane } from 'tweakpane';
 
@@ -23,10 +24,9 @@ const frag = glsl(/*glsl*/ `
   uniform vec3 lightPos;
   uniform float lensLength;
   uniform bool rotateCamera;
-  uniform bool addSpecular;
-  uniform float mixBaseAndIridescent;
   uniform vec3 tint;
   uniform vec2 mouse;
+  uniform samplerCube envMap;
 
   vec2 doModel(vec3 p);
 
@@ -103,6 +103,8 @@ const frag = glsl(/*glsl*/ `
 
     vec2 collision = raytrace(rayOrigin, rayDirection);
 
+    color = textureCube(envMap, rayDirection).rgb;
+
     // If the ray collides, draw the surface
     if (collision.x > -0.5) {
       // Determine the point of collision
@@ -115,46 +117,29 @@ const frag = glsl(/*glsl*/ `
 
       // basic blinn phong lighting
       float power = blinnPhongSpec(lightDirection, eyeDirection, nor, 0.5);
-      vec3 baseColor = vec3(power, power, power) * tint;
-
-      // iridescent lighting
-      vec3 reflection = reflect(rayDirection, nor);
-      vec3 dome = vec3(0, 1, 0);
-
-      vec3 perturb = sin(pos * 10.);
-      color = spectrum( dot(nor + perturb * .05, eyeDirection) * 2.);
-
-      float specular = clamp(dot(reflection, lightDirection), 0., 1.);
-      specular = pow((sin(specular * 20. - 3.) * .5 + .5) + .1, 32.) * specular;
-      specular *= .1;
-      specular += pow(clamp(dot(reflection, lightDirection), 0., 1.) + .3, 8.) * .1;
-
-      float shadow = pow(clamp(dot(nor, dome) * .5 + 1.2, 0., 1.), 3.);
-      color = color * shadow + (addSpecular ? specular : 0.0);
-
-      // mix blinn phong lighting and iridescent lighting
-      color = mix(baseColor, color, mixBaseAndIridescent);
-
-      float near = 2.8;
-      float far = 8.;
-      float fog = (collision.x - near) / (far - near);
-      fog = clamp(fog, 0., 1.);
-      color = mix(color, bg, fog);
-      color = linearToScreen(color);
+      color = vec3(power, power, power) * tint;
     }
 
     gl_FragColor = vec4(color, 1);
   }
 `);
 
-const sketch = ({ gl, canvas }) => {
+const sketch = async ({ gl, canvas }) => {
+  const assets = await load.all({
+    posX: '../assets/posx.jpg',
+    negX: '../assets/negx.jpg',
+    posY: '../assets/posy.jpg',
+    negY: '../assets/negy.jpg',
+    posZ: '../assets/posz.jpg',
+    negZ: '../assets/negz.jpg',
+  });
+
   const PARAMS = {
     camera: { x: 3.5, y: 0, z: 3.5 },
     light: { x: 1, y: 1, z: 1 },
     lensLength: 2,
     spin: true,
     tint: { r: 0.05, g: 0.0, b: 0.97 },
-    specular: false,
     mix: 0.7,
     animateTint: true,
   };
@@ -168,39 +153,38 @@ const sketch = ({ gl, canvas }) => {
     color: { type: 'float' },
   });
   pane.addInput(PARAMS, 'spin', {});
-  pane.addInput(PARAMS, 'specular', {});
-  pane.addInput(PARAMS, 'animateTint', {});
 
   const mouse = createMouse(canvas);
 
-  return createShader({
+  const shaderSketch = createShader({
     gl,
     frag,
     uniforms: {
       cameraPos: () => Object.values(PARAMS.camera),
       lightPos: () => Object.values(PARAMS.light),
       lensLength: () => PARAMS.lensLength,
-      addSpecular: () => PARAMS.specular,
       rotateCamera: () => PARAMS['spin'],
-      mixBaseAndIridescent: () => PARAMS.mix,
-      tint: ({ playhead }) =>
-        PARAMS.animateTint
-          ? lerpFrames(
-              [
-                [1, 0, 0],
-                [0, 1, 0],
-                [0, 0, 1],
-                [1, 0, 0],
-              ],
-              playhead
-            )
-          : Object.values(PARAMS.tint),
+      tint: () => Object.values(PARAMS.tint),
       resolution: ({ width, height }) => [width, height],
       time: ({ time }) => time,
       playhead: ({ playhead }) => playhead,
       mouse: () => mouse.position,
+      envMap: () => cubeMap,
     },
   });
+
+  const { regl } = shaderSketch;
+
+  const cubeMap = regl.cube(
+    assets.posX,
+    assets.negX,
+    assets.posY,
+    assets.negY,
+    assets.posZ,
+    assets.negZ
+  );
+
+  return shaderSketch;
 };
 
 canvasSketch(sketch, settings);

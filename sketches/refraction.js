@@ -2,6 +2,7 @@ const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
 const glsl = require('glslify');
 const createMouse = require('../utils/mouse');
+const load = require('load-asset');
 import { lerpFrames } from 'canvas-sketch-util/math';
 import { Pane } from 'tweakpane';
 
@@ -27,6 +28,7 @@ const frag = glsl(/*glsl*/ `
   uniform float mixBaseAndIridescent;
   uniform vec3 tint;
   uniform vec2 mouse;
+  uniform samplerCube envMap;
 
   vec2 doModel(vec3 p);
 
@@ -103,6 +105,8 @@ const frag = glsl(/*glsl*/ `
 
     vec2 collision = raytrace(rayOrigin, rayDirection);
 
+    color = textureCube(envMap, rayDirection).rgb;
+
     // If the ray collides, draw the surface
     if (collision.x > -0.5) {
       // Determine the point of collision
@@ -147,7 +151,16 @@ const frag = glsl(/*glsl*/ `
   }
 `);
 
-const sketch = ({ gl, canvas }) => {
+const sketch = async ({ gl, canvas }) => {
+  const assets = await load.all({
+    posX: '../assets/posx.jpg',
+    negX: '../assets/negx.jpg',
+    posY: '../assets/posy.jpg',
+    negY: '../assets/negy.jpg',
+    posZ: '../assets/posz.jpg',
+    negZ: '../assets/negz.jpg',
+  });
+
   const PARAMS = {
     camera: { x: 3.5, y: 0, z: 3.5 },
     light: { x: 1, y: 1, z: 1 },
@@ -173,7 +186,7 @@ const sketch = ({ gl, canvas }) => {
 
   const mouse = createMouse(canvas);
 
-  return createShader({
+  const shaderSketch = createShader({
     gl,
     frag,
     uniforms: {
@@ -199,8 +212,22 @@ const sketch = ({ gl, canvas }) => {
       time: ({ time }) => time,
       playhead: ({ playhead }) => playhead,
       mouse: () => mouse.position,
+      envMap: () => cubeMap,
     },
   });
+
+  const { regl } = shaderSketch;
+
+  const cubeMap = regl.cube(
+    assets.posX,
+    assets.negX,
+    assets.posY,
+    assets.negY,
+    assets.posZ,
+    assets.negZ
+  );
+
+  return shaderSketch;
 };
 
 canvasSketch(sketch, settings);
