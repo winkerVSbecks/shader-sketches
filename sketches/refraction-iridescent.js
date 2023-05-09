@@ -194,13 +194,13 @@ const frag = glsl(/*glsl*/ `
       float optDist1 = 1. - exp(collisionIn.x * dens);
       color = mix(refractionColor, iridescentColor, optDist1);
 
-      // Fog
-      float near = 2.8;
-      float far = 8.;
-      float fog = (collision.x - near) / (far - near);
-      fog = clamp(fog, 0., 1.);
-      color = mix(color, bg, fog);
-      color = linearToScreen(color);
+      // // Fog
+      // float near = 2.8;
+      // float far = 8.;
+      // float fog = (collision.x - near) / (far - near);
+      // fog = clamp(fog, 0., 1.);
+      // color = mix(color, bg, fog);
+      // color = linearToScreen(color);
     }
 
     gl_FragColor = vec4(color, 1);
