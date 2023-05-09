@@ -106,9 +106,13 @@ const frag = glsl(/*glsl*/ `
     vec3 bg = vec3(0.);
     // Bootstrap a raytracing scene
     float cameraAngle  = rotateCamera ? 2. * PI * playhead : 0.0;
-    vec3  rayOrigin    = cameraPos; // * vec3(sin(cameraAngle), 1.0, cos(cameraAngle));
+    vec3  rayOrigin    = cameraPos * vec3(sin(cameraAngle), 1.0, cos(cameraAngle));
     rayOrigin.yz = rotate(rayOrigin.yz, -mouse.y * PI + 1.);
     rayOrigin.xz = rotate(rayOrigin.xz, -mouse.x * PI * 2.);
+    // if (rotateCamera) {
+    //   rayOrigin.xz = rotate(rayOrigin.xz, cameraAngle);
+    //   rayOrigin.yz = rotate(rayOrigin.xz, cameraAngle);
+    // }
     vec3  rayTarget    = vec3(0, 0, 0);
     vec2  screenPos    = square(resolution.xy);
     vec3  rayDirection = camera(rayOrigin, rayTarget, screenPos, lensLength);
@@ -165,41 +169,42 @@ const frag = glsl(/*glsl*/ `
       float dens = .1;
       float optDist = exp(-collisionIn.x * dens);
 
-      refractedTex = refractedTex*optDist; //*vec3(1., .05,.2);
+      refractedTex = refractedTex * optDist;
 
       float fresnel = pow(1. + dot(rayDirection, nor), 5.);
 
-      // From Thomas Hooper's https://www.shadertoy.com/view/llcXWM
+      vec3 refractionColor = mix(refractedTex, reflectionOutside, fresnel);
+
+      // iridescent lighting
+      // vec3 reflection = reflect(rayDirection, nor);
       vec3 eyeDirection = normalize(rayOrigin - pos);
       vec3 lightDirection = normalize(lightPos - pos);
+      vec3 dome = vec3(0, 1, 0);
 
-      // basic blinn phong lighting
-      float power = blinnPhongSpec(lightDirection, eyeDirection, nor, 0.5);
-      color = vec3(power, power, power) * tint;
+      vec3 perturb = sin(pos * 10.);
+      color = spectrum( dot(nor + perturb * .05, eyeDirection) * 2.);
 
-      color = mix(refractedTex, reflectionOutside, fresnel);
+      float specular = clamp(dot(reflection, lightDirection), 0., 1.);
+      specular = pow((sin(specular * 20. - 3.) * .5 + .5) + .1, 32.) * specular;
+      specular *= .1;
+      specular += pow(clamp(dot(reflection, lightDirection), 0., 1.) + .3, 8.) * .1;
 
-      // // iridescent lighting
-      // vec3 reflection = reflect(rayDirection, nor);
-      // vec3 dome = vec3(0, 1, 0);
+      float shadow = pow(clamp(dot(nor, dome) * .5 + 1.2, 0., 1.), 3.);
+      vec3 iridescentColor = color * shadow + (addSpecular ? specular : 0.0);
 
-      // vec3 perturb = sin(pos * 10.);
-      // color = spectrum( dot(nor + perturb * .05, eyeDirection) * 2.);
+      // color = mix(refractionColor, iridescentColor, mixBaseAndIridescent);
 
-      // float specular = clamp(dot(reflection, lightDirection), 0., 1.);
-      // specular = pow((sin(specular * 20. - 3.) * .5 + .5) + .1, 32.) * specular;
-      // specular *= .1;
-      // specular += pow(clamp(dot(reflection, lightDirection), 0., 1.) + .3, 8.) * .1;
+      color = refractionColor;
+      float optDist1 = 1. - exp(collisionIn.x * dens);
+      color = mix(refractionColor, iridescentColor, optDist1);
 
-      // float shadow = pow(clamp(dot(nor, dome) * .5 + 1.2, 0., 1.), 3.);
-      // color = color * shadow + (addSpecular ? specular : 0.0);
-
-      // float near = 2.8;
-      // float far = 8.;
-      // float fog = (collision.x - near) / (far - near);
-      // fog = clamp(fog, 0., 1.);
-      // color = mix(color, bg, fog);
-      // color = linearToScreen(color);
+      // Fog
+      float near = 2.8;
+      float far = 8.;
+      float fog = (collision.x - near) / (far - near);
+      fog = clamp(fog, 0., 1.);
+      color = mix(color, bg, fog);
+      color = linearToScreen(color);
     }
 
     gl_FragColor = vec4(color, 1);
