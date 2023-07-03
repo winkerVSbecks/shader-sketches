@@ -7,7 +7,8 @@ import { Pane } from 'tweakpane';
 
 // Setup our sketch
 const settings = {
-  dimensions: [1080, 1080],
+  // dimensions: [1080, 1080],
+  dimensions: [1920, 1080],
   context: 'webgl',
   animate: true,
   duration: 10,
@@ -41,8 +42,8 @@ const frag = glsl(/*glsl*/ `
 
   // Using some magic folding stuff described here: https://youtu.be/0RWaR7zApEo?t=181
   float sdCrystal(vec3 p) {
-    float c = cos(3.1415/5.), s=sqrt(0.75-c*c);
-    vec3 n = vec3(-0.5, -c, s);
+    float c = cos(3.1415/5.), s=sqrt(0.75-c*c); // magic values
+    vec3 n = vec3(-0.5, -c, s); // magic direction to fold stuff
 
     p = abs(p);
     p -= 2.*min(0., dot(p, n))*n;
@@ -58,16 +59,7 @@ const frag = glsl(/*glsl*/ `
   }
 
   vec2 doModel(vec3 p) {
-    float d = 1e10;
-    float offsetX = 0.0625;
-    float offsetY = 0.125;
-
-    float amount = playhead * PI * 2.;
-    float rotation = sin(amount) * PI * 0.25;
-    float bend = cos(amount) * .5;
-
-    d = min(d, sdCrystal(p));
-
+    float d = sdCrystal(p);
     return vec2(d, 0.0);
   }
 
@@ -90,8 +82,8 @@ const frag = glsl(/*glsl*/ `
   }
 
   void main() {
-    vec3 color = vec3(0.0);
-    vec3 bg = vec3(0.);
+    vec3 bg = vec3(0.075,0.071,0.09);
+    vec3 color = vec3(0.075,0.071,0.09);
     // Bootstrap a raytracing scene
     float cameraAngle  = rotateCamera ? 2. * PI * playhead : 0.0;
     vec3  rayOrigin    = cameraPos * vec3(sin(cameraAngle), 1.0, cos(cameraAngle));
@@ -109,11 +101,10 @@ const frag = glsl(/*glsl*/ `
       vec3 pos = rayOrigin + rayDirection * collision.x;
       vec3 nor = normal(pos);
 
-      // From Thomas Hooper's https://www.shadertoy.com/view/llcXWM
       vec3 eyeDirection = normalize(rayOrigin - pos);
       vec3 lightDirection = normalize(lightPos - pos);
 
-      // basic blinn phong lighting
+      // basic blinn phong lighting from Thomas Hooper's https://www.shadertoy.com/view/llcXWM
       float power = blinnPhongSpec(lightDirection, eyeDirection, nor, 0.5);
       vec3 baseColor = vec3(power, power, power) * tint;
 
