@@ -21,17 +21,13 @@ const frag = glsl(/* glsl */ `
   uniform float time;
   varying vec2 vUv;
   uniform vec3 background;
-  uniform vec3 foreground;
+  uniform vec3 foregroundA;
+  uniform vec3 foregroundB;
 
-  void main () {
-    vec2 uv = -0.5 + vUv;
-    vec3 color = vec3(0);
-
-    // zoom out
-    uv *= 5.;
+  vec3 cairo(vec2 uv) {
     // id for each tile
     vec2 id = floor(uv);
-    float check = mod(id.x + id.y, 2.);
+    float check = mod(id.x + id.y, 2.); // 0 or 1
     // center the uv in each tile
     uv = fract(uv)-.5;
     // mirror
@@ -41,24 +37,50 @@ const frag = glsl(/* glsl */ `
     if(check == 1.) p = p.yx;
 
     float k = sin(PI * time); // 0 - 1
-    float a = (k*.5+.5) * PI;
+    float a = (k * .5 + .5) * PI;
     vec2 n = vec2(sin(a), cos (a));
 
-    float d = dot (p-.5, n); // slanted line
+    float d = dot(p-.5, n); // slanted line
+
+    if (d * (check-0.5) < 0.) {
+      id.x += sign(uv.x) * 0.5;
+    } else {
+      id.y += sign(uv.y) * 0.5;
+    }
+
     d = min(d, p.x); // straight line
     d = max(d, -p.y); // straight line
     d = abs(d);
+    d = min(d, dot(p-.5, vec2(n.y, -n.x)));
 
     float th = 0.01;
     float t = smoothstep(th, 0., d-th*.5);
-    color = mix(background, foreground, t);
+
+    // if idx. is even
+    if (fract(id.x) != 0.) {
+      return mix(background, foregroundA, t);
+    } else {
+      return mix(foregroundB, foregroundA, t);
+    }
+  }
+
+  void main () {
+    vec2 uv = -0.5 + vUv;
+    vec3 color = vec3(0.0);
+
+    // zoom out
+    uv *= 5.;
+    // tile
+    color = cairo(uv);
+
+    // if (max(p.x, p.y)>.49) color.r += .8; // debug grid
 
     gl_FragColor = vec4(color, 1.0);
   }
 `);
 
 const sketch = ({ gl }) => {
-  const { background, foreground } = colors();
+  const { background, foregroundA, foregroundB } = colors();
 
   const res = 0.1;
   return createShader({
@@ -70,7 +92,8 @@ const sketch = ({ gl }) => {
       res,
       count: 1 / res,
       background,
-      foreground,
+      foregroundA,
+      foregroundB,
     },
   });
 };
@@ -88,19 +111,26 @@ function colors(minContrast = 1) {
       color !== background
   );
 
-  const foreground = Random.pick(colors);
+  const foregroundA = Random.pick(colors);
+  const foregroundB = Random.pick(colors);
+
   console.log(
-    `%c ${background}`,
-    `background: ${background}; color: ${foreground};`
+    `%c background: ${background}`,
+    `background: ${background}; color: ${foregroundA};`
   );
   console.log(
-    `%c ${foreground}`,
-    `background: ${foreground}; color: ${background};`
+    `%c foregroundA: ${foregroundA}`,
+    `background: ${foregroundA}; color: ${background};`
+  );
+  console.log(
+    `%c foregroundB: ${foregroundB}`,
+    `background: ${foregroundB}; color: ${background};`
   );
 
   return {
     background: new THREE.Color(background).toArray(),
-    foreground: new THREE.Color(foreground).toArray(),
+    foregroundA: new THREE.Color(foregroundA).toArray(),
+    foregroundB: new THREE.Color(foregroundB).toArray(),
   };
 }
 
