@@ -1,7 +1,7 @@
 function createMouse(canvas, opts = {}) {
   const mouse = {
     moving: false,
-    position: [0, 0],
+    position: [0.5, 0.5],
     normalized: [0, 0],
     dispose,
   };
