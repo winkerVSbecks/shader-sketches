@@ -7,32 +7,24 @@ const THREE = require('three');
 const Color = require('canvas-sketch-util/color');
 const createMouse = require('../../utils/mouse');
 
-// Setup our sketch
 const settings = {
   dimensions: [1080, 1080],
   context: 'webgl2',
-  animate: true,
+  animate: false,
   duration: 8,
 };
 
-// Your glsl code
 const frag = glsl(/* glsl */ `#version 300 es
   precision highp float;
 
-  out vec4 fragColor;
-
   #define PI 3.14159265359
   #define TAU 6.283185
+  #define sampleCount 2 // use 200 for stills
 
-  vec2 doModel(vec3 p);
+  out vec4 fragColor;
 
-  #pragma glslify: raytrace = require('glsl-raytrace', map = doModel, steps = 90)
-  #pragma glslify: normal = require('glsl-sdf-normal', map = doModel)
   #pragma glslify: camera = require('glsl-camera-ray')
   #pragma glslify: square = require('glsl-square-frame')
-  #pragma glslify: smin = require('glsl-smooth-min')
-  #pragma glslify: combine = require('glsl-combine-smooth')
-  #pragma glslify: blinnPhongSpec = require('glsl-specular-blinn-phong')
 
   uniform float time;
   uniform float playhead;
@@ -46,6 +38,24 @@ const frag = glsl(/* glsl */ `#version 300 es
     return mat2(c, -s, s, c);
   }
 
+  float TIME = 0.0;
+  vec2 RUV = vec2(0.0);
+
+  float nrand( vec2 n ) {
+    return fract(sin(dot(n.xy, vec2(12.9898, 78.233))) * 43758.5453);
+  }
+
+  float n1rand( vec2 n ) {
+    TIME *= 1.01;
+    float t = fract( TIME );
+    float nrnd0 = nrand( RUV + vec2(0.07*t, -0.07*t) );
+    return nrnd0;
+  }
+
+  float sdPlane(in vec3 p, in vec3 n, in float o) {
+    return dot(p, n)-o;
+  }
+
   float dot2(vec3 v) { return dot(v,v); }
   float dot2(vec2 v) { return dot(v,v); }
   float cro( in vec2 a, in vec2 b ) { return a.x*b.y - a.y*b.x; }
@@ -56,7 +66,7 @@ const frag = glsl(/* glsl */ `#version 300 es
     return length( pa - ba*h ) - r;
   }
 
-    float sdVerticalCapsule( vec3 p, float h, float r ) {
+  float sdVerticalCapsule( vec3 p, float h, float r ) {
     p.y -= clamp( p.y, 0.0, h );
     return length( p ) - r;
   }
@@ -260,6 +270,8 @@ const frag = glsl(/* glsl */ `#version 300 es
     vec3 b = vec3(-sb, sa * 0.6, 0);
     vec3 c = vec3(-sb, 1, 0);
 
+    float d = sdPlane(p, vec3(0., 1., 0.), -3.5);
+
     // Window frame
     float win = windowFrame(p, sa, sb, t*1.5, a, b, c);
     // Jali
@@ -269,40 +281,62 @@ const frag = glsl(/* glsl */ `#version 300 es
     float wall = udQuad(p, vec3(-100,-100,0), vec3(100,-100,0), vec3(100,100,0), vec3(-100,100,0));
     wall = max(-clip, wall);
     // combine
-    float d = min(win, jal);
+    d = min(d, min(win, jal));
+    // d = min(d, jal);
     d = min(d, wall);
 
     return vec2(d * 0.8, 0);
   }
 
+  vec3 march(in vec3 ro, in vec3 rd, in float maxD) {
+    float minD=0.;
+    float threshold = 0.0001;
+
+    float d=minD;
+    for(int i=0;i<90;i++){
+        vec3 pos = ro + rd*d;
+        float tmp = doModel(pos).x;
+        if(tmp <threshold || maxD<tmp) break;
+        d += tmp;
+    }
+
+    if (maxD < d) return vec3(maxD);
+    return ro + rd * clamp(d, 0., maxD);
+  }
+
   void main() {
-    vec3 color = vec3(background);
+    TIME = time;
+    RUV = (gl_FragCoord.xy-0.5*resolution.xy)/min(resolution.x, resolution.y);
 
-    float cameraAngle  = 0.;
-    vec3 ro = vec3(0, 0, 5);
+    vec3 color = vec3(0);
+    float pix_value = 0.0;
+
+    vec3 ro = vec3(8, 4, 10);
     vec3 rt = vec3(0, 0, 0);
-    vec2 screenPos = square(resolution.xy);
-    float lensLength = 1.0;
 
-    ro.yz *= rot(PI*0.5 + PI * mouse.y);
-    ro.xz *= rot(PI*0.5 + PI * mouse.x);
+    ro.yz *= rot(-PI*0.5 + PI * mouse.y);
+    ro.xz *= rot(-PI*0.5 + PI * mouse.x);
+
+    vec2 screenPos = square(resolution);
+    float lensLength = 2.;
 
     vec3 rd = camera(ro, rt, screenPos, lensLength);
+    vec3 hit = march(ro, rd, 100.0);
+    vec3 p = ro;
+    float d = distance(hit, p);
 
-    vec3 lp = vec3(0, 5, 5);
+    for (int i = 0; i < sampleCount; i++) {
+      vec3 lSample = mix(p, hit, n1rand(ro.xy * 0.01));
+      vec3 light = vec3(2. * sin(TAU * playhead), 0., -2.);
+      float maxD = distance(lSample, light);
 
-    vec2 t = raytrace(ro, rd);
-
-    if (t.x > -0.5) {
-      vec3 pos = ro + rd * t.x;
-      vec3 nor = normal(pos);
-
-      vec3 ed = normalize(ro - pos);
-      vec3 ld = normalize(lp - pos);
-      // basic blinn phong lighting
-      float power = blinnPhongSpec(ld, ed, nor, 0.1) * 0.5;
-      color = vec3(power) * foreground;
+      if (march(lSample, normalize(light - lSample), maxD).x == maxD) {
+        pix_value += d / pow(1. + maxD, 2.);
+      }
     }
+
+    pix_value *= 1.0 / float(sampleCount);
+    color = vec3(pix_value) * background;
 
     fragColor = vec4(color, 1.0);
   }
@@ -317,17 +351,17 @@ export const vert = glsl(/* glsl */ `#version 300 es
   }
 `);
 
-const sketch = ({ gl, canvas, update }) => {
+const sketch = ({ gl, canvas }) => {
   const { background, foreground } = colors();
   const mouse = createMouse(canvas);
 
   return createShader({
     gl,
-    vert,
     frag,
+    vert,
     uniforms: {
       resolution: ({ width, height }) => [width, height],
-      time: ({ time }) => time,
+      time: ({ time }) => time + 0.1,
       playhead: ({ playhead }) => playhead,
       mouse: () => mouse.position,
       background,

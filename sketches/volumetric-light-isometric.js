@@ -8,10 +8,10 @@ const Color = require('canvas-sketch-util/color');
 const createMouse = require('../utils/mouse');
 
 const settings = {
-  dimensions: [1080, 1080],
+  dimensions: [1080 * 2, 1080 * 2],
   context: 'webgl',
   animate: true,
-  duration: 4,
+  // duration: 8,
 };
 
 const frag = glsl(/* glsl */ `
@@ -19,23 +19,11 @@ const frag = glsl(/* glsl */ `
 
   #define PI 3.14159265359
   #define TAU 6.283185
-  #define samples 8
-
-  vec2 doModel(vec3 p);
-
-  #pragma glslify: normal = require('glsl-sdf-normal', map = doModel)
-  #pragma glslify: camera = require('glsl-camera-ray')
-  #pragma glslify: square = require('glsl-square-frame')
 
   uniform float time;
   uniform float playhead;
   uniform vec2  resolution;
   uniform vec2  mouse;
-
-  mat2 rot(float a) {
-    float s=sin(a), c=cos(a);
-    return mat2(c, -s, s, c);
-  }
 
   float TIME = 0.0;
   vec2 RUV = vec2(0.0);
@@ -51,31 +39,27 @@ const frag = glsl(/* glsl */ `
     return nrnd0;
   }
 
-  float sdSphere(vec3 p, float s) {
-    return length(p)-s;
-  }
-
   float sdBox(in vec3 p, in vec3 b) {
     vec3 d = abs(p) - b;
     return length(max(d, 0.)) + min(max(d.x, max(d.y, d.z)), 0.);
   }
 
   float sdPlane(in vec3 p, in vec3 n, in float o) {
-      return dot(p, n)-o;
+    return dot(p, n)-o;
   }
 
   float opU(in float d1, in float d2) {
-      return min(d1, d2);
+    return min(d1, d2);
   }
 
   float opS(in float d1, in float d2) {
-      return max(-d1, d2);
+    return max(-d1, d2);
   }
 
-  vec2 doModel(vec3 p) {
+  float map(in vec3 p) {
     vec3 q = p;
     float res = sdPlane(q, vec3(0., 1., 0.), -2.);
-    res = opU(res, sdPlane(q, vec3(0., 1., 0.), -2.));
+
 
     vec3 size = vec3(1., 2., 0.2);
     vec3 offset = vec3(0., 0.0, 0.8);
@@ -87,7 +71,7 @@ const frag = glsl(/* glsl */ `
 
     res = opS(sdBox(q + vec3(0., 0.3, 0.), vec3(0.6, 1.7, 10)), res);
 
-    return vec2(res, 0.);
+    return res;
   }
 
   vec3 march(in vec3 ro, in vec3 rd, in float maxD) {
@@ -95,9 +79,9 @@ const frag = glsl(/* glsl */ `
     float threshold = 0.0001;
 
     float d=minD;
-    for(int i=0;i<90;i++){
+    for(int i=0;i<32;i++){
         vec3 pos = ro + rd*d;
-        float tmp = doModel(pos).x;
+        float tmp = map(pos);
         if(tmp <threshold || maxD<tmp) break;
         d += tmp;
     }
@@ -106,48 +90,71 @@ const frag = glsl(/* glsl */ `
     return ro + rd * clamp(d, 0., maxD);
   }
 
-  void main() {
-    TIME = time;
-    RUV = (gl_FragCoord.xy-0.5*resolution.xy)/min(resolution.x, resolution.y);
-    // start with a black pixel value.
-    // pix_value = 0
-    vec3 color = vec3(0.0);
-    float pix_value = 0.0;
+  vec3 calcNormal(in vec3 p) {
+  vec2 e = vec2(1.0, -1.0)*0.00001;
+    return normalize(vec3(
+      e.xyy*map(p+e.xyy) +
+      e.yxy*map(p+e.yxy) +
+      e.yyx*map(p+e.yyx) +
+      e.xxx*map(p+e.xxx)
+    ));
+  }
 
-    vec3 ro = vec3(-5, 10, 10) * .5;
-    vec3 rt = vec3(0, 0, 0);
-
-    ro.yz *= rot(-PI*0.5 + PI * mouse.y);
-    ro.xz *= rot(-PI*0.5 + PI * mouse.x);
-
-    vec2 screenPos = square(resolution);
-    float lensLength = 2.;
-
-    // ro.yz *= rot(PI*0.5 + PI * playhead);
-    // ro.xz *= rot(PI*0.5 + PI * playhead);
-
-    vec3 rd = camera(ro, rt, screenPos, lensLength);
-    vec3 hit = march(ro, rd, 100.0);
+  vec3 render(in vec3 ro, in vec3 rd) {
     vec3 p = ro;
+    vec3 hit = march(ro, rd, 100.0);
     float d = distance(hit, p);
 
-    for (int i = 0; i < samples; i++) {
-      vec3 sample = mix(p, hit, n1rand(ro.xy * 0.01));
-      vec3 light = vec3(0., .1, sin(TAU * playhead) * 1.7);
-      float maxD = distance(sample, light);
+    float pix = 0.;
 
-      if (march(sample, normalize(light - sample), maxD).x == maxD) {
-        pix_value += d / pow(1. + maxD, 2.);
-      }
+    const int n = 8;
 
-      // vec3 nor = normal(hit);
-      // color = nor * 0.5 + 0.5;
+    for (int i = 0; i < n; ++i) {
+
+        vec3 sample = mix(p, hit, n1rand(ro.xy * 0.01));
+
+        vec3 light = vec3(0., .1, sin(-time * 0.5) * 1.7);
+        float maxD = distance(sample, light);
+
+        if (march(sample, normalize(light - sample), maxD).x == maxD) {
+            pix += d / pow(1. + maxD, 2.);
+        }
     }
 
-    pix_value *= 1.0 / float(samples);
-    color = vec3(pix_value);
+    pix *= 1.0 / float(n);
 
-    gl_FragColor = vec4(color, 1.0);
+    return vec3(pix);
+  }
+
+  mat3 lookAt(in vec3 eye, in vec3 tar, in float r) {
+    vec3 cw = normalize(tar - eye);// camera w
+    vec3 cp = vec3(0, 1.0, 0.);// camera up
+    vec3 cu = normalize(cross(cw, cp));// camera u
+    vec3 cv = normalize(cross(cu, cw));// camera v
+    return mat3(cu, cv, cw);
+  }
+
+  void main() {
+    TIME = time;
+
+    vec2 p = (gl_FragCoord.xy-0.5*resolution.xy)/min(resolution.x, resolution.y);
+    RUV = p;
+
+    float ang = 0.6;
+    vec3 ro = vec3(cos(ang), 0.0, sin(ang)) * 10.; // camera pos
+    ro.y = 15.;
+
+    vec3 tar = vec3(0.); // eye target
+
+    vec3 rd_orth = normalize(tar - ro);// ray direction via orthographic projection
+
+    mat3 cam = lookAt(rd_orth, tar, 0.0);
+    vec3 ro_orth = ro + cam * vec3(p * 10., 0.);// ray origin
+
+    // rendering
+    vec3 col = render(ro_orth, rd_orth);
+
+    gl_FragColor = vec4(col, 1.0);
   }
 `);
 
