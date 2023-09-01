@@ -10,8 +10,8 @@ const createMouse = require('../../utils/mouse');
 const settings = {
   dimensions: [1080, 1080],
   context: 'webgl2',
-  animate: false,
-  duration: 8,
+  animate: true,
+  duration: 4,
 };
 
 const frag = glsl(/* glsl */ `#version 300 es
