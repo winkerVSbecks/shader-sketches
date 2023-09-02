@@ -5,7 +5,8 @@ const Random = require('canvas-sketch-util/random');
 const tome = require('chromotome');
 const THREE = require('three');
 const Color = require('canvas-sketch-util/color');
-const createMouse = require('../utils/mouse');
+const createMouse = require('../../utils/mouse');
+import { Pane } from 'tweakpane';
 
 const settings = {
   dimensions: [1080, 1080],
@@ -19,8 +20,12 @@ const frag = glsl(/* glsl */ `
 
   #define PI 3.14159265359
   #define TAU 6.283185
-  #define sampleCount 12
+  #define sampleCount 2
 
+  vec2 doModel(vec3 p);
+
+  #pragma glslify: raytrace = require('glsl-raytrace', map = doModel, steps = 90)
+  #pragma glslify: normal = require('glsl-sdf-normal', map = doModel)
   #pragma glslify: camera = require('glsl-camera-ray')
   #pragma glslify: square = require('glsl-square-frame')
 
@@ -28,6 +33,10 @@ const frag = glsl(/* glsl */ `
   uniform float playhead;
   uniform vec2  resolution;
   uniform vec2  mouse;
+  uniform vec3  background;
+  uniform vec3  foreground;
+  uniform vec3  cameraPos;
+  uniform float mode;
 
   mat2 rot(float a) {
     float s=sin(a), c=cos(a);
@@ -58,38 +67,38 @@ const frag = glsl(/* glsl */ `
   }
 
   float sdPlane(in vec3 p, in vec3 n, in float o) {
-      return dot(p, n)-o;
+    return dot(p, n)-o;
   }
 
   float opU(in float d1, in float d2) {
-      return min(d1, d2);
+    return min(d1, d2);
   }
 
   float opS(in float d1, in float d2) {
-      return max(-d1, d2);
+    return max(-d1, d2);
   }
 
   vec2 doModel(vec3 p) {
     vec3 q = p;
-    float res = sdPlane(q, vec3(0., 1., 0.), -2.);
-    res = opU(res, sdPlane(q, vec3(0., 1., 0.), -2.));
 
+    // floor
+    float res = sdPlane(p, vec3(0., 1., 0.), -4.);
+
+    // main geometry
     vec3 size = vec3(1., 2., 0.2);
     vec3 offset = vec3(0., 0.0, 0.8);
-    res = opU(res, sdBox(q + offset * -4., size));
-    res = opU(res, sdBox(q + offset * -3., size));
-    res = opU(res, sdBox(q + offset * -2., size));
-    res = opU(res, sdBox(q + offset * -1., size));
-    res = opU(res, sdBox(q + offset * 0. , size));
-    res = opU(res, sdBox(q + offset * 1. , size));
-    res = opU(res, sdBox(q + offset * 2. , size));
-    res = opU(res, sdBox(q + offset * 2. , size));
-    res = opU(res, sdBox(q + offset * 3. , size));
-    res = opU(res, sdBox(q + offset * 4. , size));
-    res = opU(res, sdBox(q + offset * 5. , size));
-    res = opU(res, sdBox(q + offset * 6. , size));
+    res = opU(res, sdBox(p + offset * -3., size));
+    res = opU(res, sdBox(p + offset * -2., size));
+    res = opU(res, sdBox(p + offset * -1., size));
+    res = opU(res, sdBox(p + offset * 0. , size));
+    res = opU(res, sdBox(p + offset * 1. , size));
+    res = opU(res, sdBox(p + offset * 2. , size));
+    res = opU(res, sdBox(p + offset * 2. , size));
+    res = opU(res, sdBox(p + offset * 3. , size));
+    res = opS(sdBox(p + vec3(0., 0.3, 0.), vec3(0.6, 1.7, 10)), res);
 
-    res = opS(sdBox(q + vec3(0., 0.3, 0.), vec3(0.6, 1.7, 10)), res);
+    // back wall
+    res = opU(res, sdPlane(p, vec3(0., 0., 1.), -8.));
 
     return vec2(res, 0.);
   }
@@ -113,12 +122,11 @@ const frag = glsl(/* glsl */ `
   void main() {
     TIME = time;
     RUV = (gl_FragCoord.xy-0.5*resolution.xy)/min(resolution.x, resolution.y);
-    // start with a black pixel value.
-    // pix_value = 0
+
     vec3 color = vec3(0.0);
     float pix_value = 0.0;
 
-    vec3 ro = vec3(-5, 10, 10) * .5;
+    vec3 ro = cameraPos;
     vec3 rt = vec3(0, 0, 0);
 
     ro.yz *= rot(-PI*0.5 + PI * mouse.y);
@@ -143,15 +151,50 @@ const frag = glsl(/* glsl */ `
     }
 
     pix_value *= 1.0 / float(sampleCount);
-    color = vec3(pix_value);
+
+    if (mode == 0.) {
+      // debug
+      vec3 nor = normal(hit);
+      color = nor * 0.5 + 0.5;
+    } else if (mode == 1.) {
+      // color mode
+      // pix_value = clamp(pix_value, 0., 1.);
+      color = mix(background, foreground, pix_value);
+    } else {
+      // black and white
+      color = vec3(pix_value);
+    }
 
     gl_FragColor = vec4(color, 1.0);
   }
 `);
 
-const sketch = ({ gl, canvas, update }) => {
+const sketch = ({ gl, canvas }) => {
   const { background, foreground } = colors();
   const mouse = createMouse(canvas);
+
+  const PARAMS = {
+    background: { r: background[0], g: background[1], b: background[2] },
+    foreground: { r: foreground[0], g: foreground[1], b: foreground[2] },
+    camera: { x: -5, y: 10, z: 10 },
+    mode: 1,
+  };
+
+  const pane = new Pane();
+  pane.addInput(PARAMS, 'background', { color: { type: 'float' } });
+  pane.addInput(PARAMS, 'foreground', { color: { type: 'float' } });
+  pane.addInput(PARAMS, 'camera', {
+    x: { min: -10, max: 20, step: 0.5 },
+    y: { min: -10, max: 20, step: 0.5 },
+    z: { min: -10, max: 20, step: 0.5 },
+  });
+  pane.addInput(PARAMS, 'mode', {
+    options: {
+      debug: 0,
+      color: 1,
+      'black and white': 2,
+    },
+  });
 
   return createShader({
     gl,
@@ -161,8 +204,10 @@ const sketch = ({ gl, canvas, update }) => {
       time: ({ time }) => time + 0.1,
       playhead: ({ playhead }) => playhead,
       mouse: () => mouse.position,
-      background,
-      foreground,
+      cameraPos: () => Object.values(PARAMS.camera),
+      background: () => Object.values(PARAMS.background),
+      foreground: () => Object.values(PARAMS.foreground),
+      mode: () => PARAMS.mode,
     },
   });
 };
