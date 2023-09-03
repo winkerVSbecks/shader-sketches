@@ -1,5 +1,6 @@
 const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
+const Random = require('canvas-sketch-util/random');
 const glsl = require('glslify');
 const tome = require('chromotome');
 const THREE = require('three');
@@ -91,8 +92,13 @@ const frag = glsl(/* glsl */ `
   }
 `);
 
-const sketch = ({ gl }) => {
+const sketch = ({ gl, canvas, context }) => {
   const { background, foreground, stitch } = colors();
+
+  const [svgFilter, feTurbulence, feDisplacementMap] = createSVGFilter();
+
+  document.body.appendChild(svgFilter);
+  canvas.style.filter = 'url(#hand-drawn)';
 
   return createShader({
     gl,
@@ -118,3 +124,49 @@ function colors() {
 }
 
 canvasSketch(sketch, settings);
+
+function createSVGFilter() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '0');
+  svg.setAttribute('height', '0');
+  svg.style.position = 'absolute';
+  svg.style.zIndex = '-1';
+
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  svg.appendChild(defs);
+
+  const filter = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'filter'
+  );
+  filter.setAttribute('id', 'hand-drawn');
+  filter.setAttribute('x', '0');
+  filter.setAttribute('y', '0');
+  filter.setAttribute('width', '100%');
+  filter.setAttribute('height', '100%');
+  defs.appendChild(filter);
+
+  const feTurbulence = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'feTurbulence'
+  );
+  feTurbulence.setAttribute('type', 'fractalNoise');
+  feTurbulence.setAttribute('baseFrequency', 0.03);
+  feTurbulence.setAttribute('numOctaves', 1);
+  feTurbulence.setAttribute('result', 'noise');
+  feTurbulence.setAttribute('seed', Random.value());
+  filter.appendChild(feTurbulence);
+
+  const feDisplacementMap = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'feDisplacementMap'
+  );
+  feDisplacementMap.setAttribute('in', 'SourceGraphic');
+  feDisplacementMap.setAttribute('in2', 'noise');
+  feDisplacementMap.setAttribute('scale', '5');
+  feDisplacementMap.setAttribute('xChannelSelector', 'R');
+  feDisplacementMap.setAttribute('yChannelSelector', 'G');
+  filter.appendChild(feDisplacementMap);
+
+  return [svg, feTurbulence, feDisplacementMap];
+}

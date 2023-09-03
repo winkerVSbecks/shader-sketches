@@ -43,6 +43,21 @@ const frag = glsl(/* glsl */ `
     return length(max(d,0.0)) + min(max(d.x,d.y),0.0);
   }
 
+  // from https://www.shadertoy.com/view/Ntyczt
+  float udSegment(vec2 p, vec2 a, vec2 b, float filled, float gap, float offset) {
+    vec2 ba = b-a;
+    vec2 pa = p-a;
+    float h =clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+
+    // Here's where the magic happens
+    h -= offset;
+    float s = floor(h / (filled + gap)) * (filled + gap);
+    h = s + clamp(h - s, gap * 0.5, gap * 0.5 + filled);
+    h += offset;
+
+    return length(pa-h*ba);
+  }
+
   void main () {
     vec2 uv = vUv;
     // move the y origin to middle
@@ -102,10 +117,10 @@ const frag = glsl(/* glsl */ `
     color = mix(color, sienna, 1.0-step(0.01, abs(d)));
 
     // binding seam
-    float sd = sdBox(buv, vec2(.994));
+    float bd = udSegment(abs(buv), vec2(0., .993), vec2(.993, .993), 0.01, 0.01, 0.);
+    bd = min(bd, udSegment(abs(buv), vec2(.993, 0.), vec2(.993, .993), 0.01, 0.01, 0.));
     vec3 seam = color - vec3(0.2);
-    color = mix(color, seam, 1.0-step(0.001, abs(sd)));
-
+    color = mix(color, seam, 1.0-smoothstep(0.0,0.001, abs(bd)));
 
     // debug grid
     // color = mix(color, vec3(1.,0.5,1.), grid(st, 0.05));
