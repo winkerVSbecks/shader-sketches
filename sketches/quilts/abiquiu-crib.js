@@ -2,7 +2,6 @@ const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
 const glsl = require('glslify');
 
-// Setup our sketch
 const settings = {
   dimensions: [50 * 30, 38 * 30],
   context: 'webgl',
