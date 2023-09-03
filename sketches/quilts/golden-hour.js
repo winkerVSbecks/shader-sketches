@@ -10,11 +10,14 @@ const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 2,
+  duration: 20,
 };
 
 const frag = glsl(/* glsl */ `
   precision highp float;
+
+  #pragma glslify: fbm3d = require('glsl-fractal-brownian-noise/3d')
+
 
   #define PI 3.14159265359
 
@@ -26,11 +29,6 @@ const frag = glsl(/* glsl */ `
 
   float grid(vec2 st, float res){
     return 1.-(step(res, st.x) * step(res, st.y));
-  }
-
-  float sdBox(vec2 p, vec2 b) {
-    vec2 d = abs(p)-b;
-    return length(max(d,0.0)) + min(max(d.x,d.y),0.0);
   }
 
   // from https://www.shadertoy.com/view/Ntyczt
@@ -49,7 +47,9 @@ const frag = glsl(/* glsl */ `
   }
 
   void main () {
-    vec2 p = 2. * vUv -1.;
+    vec2 vuv = vUv + 0.03* fbm3d(vec3(vUv, sin(playhead * PI)), 6);
+
+    vec2 p = 2. * vuv -1.;
     vec2 uv = p;
     // repeat the pattern
     uv *= vec2(5.5, 5.5);
@@ -95,16 +95,10 @@ const frag = glsl(/* glsl */ `
 const sketch = ({ gl, canvas, context }) => {
   const { background, foreground, stitch } = colors();
 
-  const [svgFilter, feTurbulence, feDisplacementMap] = createSVGFilter();
-
-  document.body.appendChild(svgFilter);
-  canvas.style.filter = 'url(#hand-drawn)';
-
   return createShader({
     gl,
     frag,
     uniforms: {
-      resolution: ({ width, height }) => [width, height],
       playhead: ({ playhead }) => playhead,
       background,
       foreground,
@@ -124,49 +118,3 @@ function colors() {
 }
 
 canvasSketch(sketch, settings);
-
-function createSVGFilter() {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('width', '0');
-  svg.setAttribute('height', '0');
-  svg.style.position = 'absolute';
-  svg.style.zIndex = '-1';
-
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-  svg.appendChild(defs);
-
-  const filter = document.createElementNS(
-    'http://www.w3.org/2000/svg',
-    'filter'
-  );
-  filter.setAttribute('id', 'hand-drawn');
-  filter.setAttribute('x', '0');
-  filter.setAttribute('y', '0');
-  filter.setAttribute('width', '100%');
-  filter.setAttribute('height', '100%');
-  defs.appendChild(filter);
-
-  const feTurbulence = document.createElementNS(
-    'http://www.w3.org/2000/svg',
-    'feTurbulence'
-  );
-  feTurbulence.setAttribute('type', 'fractalNoise');
-  feTurbulence.setAttribute('baseFrequency', 0.03);
-  feTurbulence.setAttribute('numOctaves', 1);
-  feTurbulence.setAttribute('result', 'noise');
-  feTurbulence.setAttribute('seed', Random.value());
-  filter.appendChild(feTurbulence);
-
-  const feDisplacementMap = document.createElementNS(
-    'http://www.w3.org/2000/svg',
-    'feDisplacementMap'
-  );
-  feDisplacementMap.setAttribute('in', 'SourceGraphic');
-  feDisplacementMap.setAttribute('in2', 'noise');
-  feDisplacementMap.setAttribute('scale', '5');
-  feDisplacementMap.setAttribute('xChannelSelector', 'R');
-  feDisplacementMap.setAttribute('yChannelSelector', 'G');
-  filter.appendChild(feDisplacementMap);
-
-  return [svg, feTurbulence, feDisplacementMap];
-}

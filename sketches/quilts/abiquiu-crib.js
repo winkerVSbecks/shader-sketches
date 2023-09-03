@@ -6,7 +6,7 @@ const settings = {
   dimensions: [50 * 30, 38 * 30],
   context: 'webgl',
   animate: true,
-  duration: 2,
+  duration: 20,
 };
 
 // wheat:'D6B17C
@@ -20,6 +20,8 @@ const settings = {
 // https://m.media-amazon.com/images/I/81iYv-QbRCL.jpg
 const frag = glsl(/* glsl */ `
   precision highp float;
+
+  #pragma glslify: fbm3d = require('glsl-fractal-brownian-noise/3d')
 
   #define PI 3.14159265359
   #define wheat vec3(0.839, 0.694, 0.486)
@@ -59,9 +61,10 @@ const frag = glsl(/* glsl */ `
   }
 
   void main () {
-    vec2 uv = vUv;
+    vec2 vuv = vUv + 0.01* fbm3d(vec3(vUv, sin(playhead * PI)), 6);
+    vec2 uv = vuv;
     // move the y origin to middle
-    uv.y = -1. + 2. * vUv.y;
+    uv.y = -1. + 2. * vuv.y;
     // shift the pattern by half a cell to align to the edges
     uv.y += .5 / 9.5;
     // repeat the pattern
@@ -104,12 +107,12 @@ const frag = glsl(/* glsl */ `
     }
 
     // quilting
-    vec2 quv = vec2(fract(vUv.x * 25. * 12.), fract(vUv.y * 19. * 5.));
-
-    // dashed lines
-    if (fract(quv.x) > 0.5) {
-      color = mix(color, batting, 1.-step(0.05, quv.y));
-    }
+    vec2 quv = fract(
+      (vUv + 0.01 * fbm3d(vec3(vUv, sin(playhead * PI)), 6)) * vec2(50, 19)
+    );
+    float bd1 = udSegment(quv, vec2(0., .99), vec2(.99, .99), 0.125, 0.125, 0.);
+    bd1 = clamp( bd1, 0., .5);
+    color = mix(color, batting, 1.0-smoothstep(0.0,0.02, abs(bd1)));
 
     // binding
     vec2 buv = 2. * vUv - 1.;
