@@ -1,14 +1,15 @@
 const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
 const glsl = require('glslify');
-const load = require('load-asset');
+const { lowContrast } = require('../../utils/clrs-ramps');
+const generateSubtractiveColors = require('../../utils/subtractive-color');
 
 // Setup our sketch
 const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 4,
+  duration: 2,
 };
 
 // Your glsl code
@@ -21,6 +22,11 @@ const frag = glsl(/* glsl */ `
   uniform float time;
   uniform float playhead;
   varying vec2 vUv;
+  uniform vec3 color1;
+  uniform vec3 color2;
+  uniform vec3 color3;
+  uniform vec3 color4;
+  uniform vec3 color5;
   uniform sampler2D texture;
 
   vec2 cMul(vec2 a, vec2 b) {return vec2( a.x*b.x -  a.y*b.y,a.x*b.y + a.y * b.x);}
@@ -45,10 +51,29 @@ const frag = glsl(/* glsl */ `
     return 1. - length(2.*z - 1.);
   }
 
+  vec3 stripeColor(float p) {
+    float frequency = 5.0;
+    float stripes = frequency * time + frequency * p;
+    float rounded = floor(stripes);
+    float t = mod(rounded, 5.0);
+
+    if (t == 4.0) {
+      return color1;
+    } if (t == 3.0) {
+      return color2;
+    } else if (t == 2.0) {
+      return color3;
+    } else if (t == 1.0) {
+      return color4;
+    } else if (t == 0.0) {
+      return color5;
+    }
+  }
+
   vec3 color(vec2 z) {
     vec2 a_z = abs(z);
     float scale = f(max(a_z.x,a_z.y));
-    return texture2D(texture,z*scale+0.5).xyz;
+    return stripeColor( circle(fract(z*scale)) );
   }
 
   void main () {
@@ -60,14 +85,14 @@ const frag = glsl(/* glsl */ `
     float angle = atan(log(ratio) / (2.0*PI));
     p = cLog(p);
     p = cDiv(p, cExp(vec2(0,angle)) * cos(angle));
-    p = cExp(p - vec2(mod(playhead * 1.39, 4.19) - 4., 0));
+    p = cExp(p - vec2(mod(time, 4.19) - 4., 0));
 
     gl_FragColor = vec4(color(p), 1.0);
   }
 `);
 
-const sketch = async ({ gl }) => {
-  const texture = await load('../assets/55_h3lvny.png');
+const sketch = ({ gl }) => {
+  const clrs = generateSubtractiveColors(); //lowContrast();
 
   return createShader({
     gl,
@@ -75,7 +100,11 @@ const sketch = async ({ gl }) => {
     uniforms: {
       time: ({ time }) => time,
       playhead: ({ playhead }) => playhead,
-      texture,
+      color1: clrs[0],
+      color2: clrs[1],
+      color3: clrs[2],
+      color4: clrs[3],
+      color5: clrs[4],
     },
   });
 };
