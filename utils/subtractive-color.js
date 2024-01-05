@@ -6,8 +6,8 @@ const {
 } = require('culori/bundled/culori.cjs');
 const { generateColorRamp } = require('rampensau/dist/index.cjs');
 
-const newOptions = () => ({
-  total: 6,
+const newOptions = (total) => ({
+  total,
   hStart: Math.random() * 360,
   hCycles: Math.random() < 0.5 ? -1.25 + Math.random() : 1.25 + Math.random(),
   sRange:
@@ -89,8 +89,8 @@ function hsl2farbrad(h, s, l) {
   return ryb2rgb([rgbColor.r, rgbColor.g, rgbColor.b]);
 }
 
-export function generateSubtractiveColors() {
-  const options = newOptions();
+export function generateSubtractiveColors({ total = 6 }) {
+  const options = newOptions(total);
   const colorHSL = generateColorRamp(options);
   const colors = colorHSL
     .map((hsl) => hsl2farbrad(...hsl))
