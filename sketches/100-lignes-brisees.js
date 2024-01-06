@@ -1,9 +1,6 @@
 const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
 const glsl = require('glslify');
-const Random = require('canvas-sketch-util/random');
-const tome = require('chromotome');
-const THREE = require('three');
 const generateSubtractiveColors = require('../utils/subtractive-color');
 
 const paletteCount = 8;
@@ -142,26 +139,10 @@ function colors(minContrast = 1) {
   const background = colors.pop();
   const curtain = colors.pop();
 
-  // let palette = tome.get(); // spatial03i
-  // if (!palette.background) palette = tome.get();
-
-  // const background = palette.background;
-
-  // const colors = palette.colors.filter((color) => color !== background);
-
-  // const options = [
-  //   Random.pick(colors),
-  //   Random.pick(colors),
-  //   Random.pick(colors),
-  //   Random.pick(colors),
-  // ];
-
-  // const curtain = Random.pick(colors);
-
   return {
-    background, //: new THREE.Color(background).toArray(),
-    curtain, //: new THREE.Color(curtain).toArray(),
-    foregrounds: colors, //: colors.map((c) => new THREE.Color(c).toArray()),
+    background,
+    curtain,
+    foregrounds: colors,
   };
 }
 
