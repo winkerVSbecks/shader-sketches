@@ -311,11 +311,11 @@ const frag = glsl(/* glsl */ `#version 300 es
     vec3 color = vec3(0);
     float pix_value = 0.0;
 
-    vec3 ro = vec3(8, 4, 10);
+    vec3 ro = vec3(6, 4, 7);
     vec3 rt = vec3(0, 0, 0);
 
-    ro.yz *= rot(-PI*0.5 + PI * mouse.y);
-    ro.xz *= rot(-PI*0.5 + PI * mouse.x);
+    // ro.yz *= rot(-PI*0.5 + PI * mouse.y);
+    // ro.xz *= rot(-PI*0.5 + PI * mouse.x);
 
     vec2 screenPos = square(resolution);
     float lensLength = 2.;
@@ -352,7 +352,7 @@ export const vert = glsl(/* glsl */ `#version 300 es
 `);
 
 const sketch = ({ gl, canvas }) => {
-  const { background, foreground } = colors();
+  // const { background, foreground } = colors();
   const mouse = createMouse(canvas);
 
   return createShader({
@@ -364,8 +364,8 @@ const sketch = ({ gl, canvas }) => {
       time: ({ time }) => time + 0.1,
       playhead: ({ playhead }) => playhead,
       mouse: () => mouse.position,
-      background,
-      foreground,
+      background: new THREE.Color('#fff').toArray(),
+      foreground: new THREE.Color('#000').toArray(),
     },
   });
 };
