@@ -15,7 +15,7 @@ const settings = {
   duration: 6,
 };
 
-// Your glsl code
+// Based on https://www.shadertoy.com/view/WdB3Dw
 const frag = glsl(/* glsl */ `
   precision highp float;
 
@@ -124,7 +124,7 @@ const frag = glsl(/* glsl */ `
       c = vec3(max(0., .01 - abs(distance)) * .5);
       c *= vec3(1.4,2.1,1.7); // blue green tint
 
-      // Accumilate some purple glow for every step
+      // Accumulate some purple glow for every step
       c += vec3(.6,.25,.7) * FUDGE_FACTORR / 160.;
       c *= smoothstep(20., 7., length(rayPosition));
 
