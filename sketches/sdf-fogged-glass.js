@@ -45,7 +45,8 @@ const frag = glsl(/* glsl */ `
   }
 
   vec3 spectrum(float n) {
-    return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
+    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
+    return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
   }
 
   mat2 Rot(float a) {
@@ -79,6 +80,7 @@ const frag = glsl(/* glsl */ `
     // float t = sin(playhead * PI);
     // d = abs(abs(d)-0.4)-0.2;
 
+    // Box split
     float off = 0.8*min(2.5*(sin(playhead * TAU)*0.5+0.5),1.5);
     p= abs(p)-off*0.8;
     p= abs(p)-off*1.2;
