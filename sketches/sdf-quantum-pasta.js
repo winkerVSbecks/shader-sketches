@@ -13,6 +13,8 @@ const settings = {
   context: 'webgl',
   animate: true,
   duration: 6,
+  fps: 60,
+  playbackRate: 60,
 };
 
 // Based on https://www.shadertoy.com/view/WdB3Dw
@@ -31,7 +33,7 @@ const frag = glsl(/* glsl */ `
   // Keep iteration count too low to pass through entire model,
   // giving the effect of fogged glass
   const float MAX_STEPS = 82.;
-  const float FUDGE_FACTORR = .6; //.8;
+  const float FUDGE_FACTORR = .5; //.8;
   const float INTERSECTION_PRECISION = .001;
   const float MAX_DIST = 20.;
 
@@ -48,15 +50,10 @@ const frag = glsl(/* glsl */ `
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.10,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.3,0.20,0.20) );
-    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,0.5),vec3(0.8,0.90,0.30) );
+    return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,0.5),vec3(0.8,0.90,0.30) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(2.0,1.0,0.0),vec3(0.5,0.20,0.25) );
-    return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
-  }
-
-  mat2 Rot(float a) {
-    float s=sin(a), c=cos(a);
-    return mat2(c, -s, s, c);
+    // return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
   }
 
   // --------------------------------------------------------
@@ -133,31 +130,19 @@ const frag = glsl(/* glsl */ `
     return d; // * 4. for appear effect;
   }
 
-  float sdEquilateralTriangle( in vec2 p, in float r ) {
-    const float k = sqrt(3.0);
-    p.x = abs(p.x) - r;
-    p.y = p.y + r/k;
-    if( p.x+k*p.y>0.0 ) p = vec2(p.x-k*p.y,-k*p.x-p.y)/2.0;
-    p.x -= clamp( p.x, -2.0*r, 0.0 );
-    return -length(p)*sign(p.y);
-  }
-
-  float sdHexagon( in vec2 p, in float r ) {
-    const vec3 k = vec3(-0.866025404,0.5,0.577350269);
-    p = abs(p);
-    p -= 2.0*min(dot(k.xy,p),0.0)*k.xy;
-    p -= vec2(clamp(p.x, -k.z*r, k.z*r), r);
-    return length(p)*sign(p.y);
-  }
-
-  float sdRoundedX( in vec2 p, in float w, in float r ) {
-    p = abs(p);
-    return length(p-min(p.x+p.y,w)*0.5) - r;
+  float sdRing( in vec2 p, in float r, in float th ) {
+    float d = length(p)-r;
+    return abs(d) - th;
   }
 
   float map(vec3 p) {
+    // p.xy = rotate(p.xy, -playhead * TAU);
+    // p.yz = rotate(p.yz, playhead * TAU);
+    // p.zx = rotate(p.zx, -playhead * TAU);
+
     float k;
     vec4 p4 = inverseStereographic(p,k);
+    // p4 *= 6.;
 
     // The inside-out rotation puts the torus at a different
     // orientation, so rotate to point it at back in the same
@@ -180,12 +165,11 @@ const frag = glsl(/* glsl */ `
 
     p.xy += repeat / 2.;
     pMod2(p.xy, vec2(repeat));
-    p.xy = rotate(p.xy, playhead * -PI * 0.845);
-    // p.xy = rotate(p.xy, playhead * -PI * 1.);
 
-    d = sdEquilateralTriangle(p.xy, .09) * .5;
-    // d = sdRoundedX(p.xy, .1, .01) * .5;
-    d = smax(d, abs(p.z) - .013, .01);
+    d = sdRing(p.xy, 0.0625, 0.01);
+
+    // Thickness of the shape
+    d = smax(d, abs(p.z) - .1, .01);
 
     d = fixDistance(d, k);
 
@@ -204,9 +188,7 @@ const frag = glsl(/* glsl */ `
 
   void main () {
     vec2 p = (-1.0 + 2.0 * vUv);
-    vec3 ro = vec3(4, 4, -4);
-    // ro.yz *= Rot(-mouse.y*PI+1.);
-    // ro.xz *= Rot(-mouse.x*TAU);
+    vec3 ro = vec3(3, 3, -3);
 
     vec3 rd = GetRayDir(p, ro, vec3(0,0.,0), 1.);
     vec3 rayPosition = ro;
