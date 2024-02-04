@@ -51,9 +51,9 @@ const frag = glsl(/* glsl */ `
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.10,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.3,0.20,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,0.5),vec3(0.8,0.90,0.30) );
-    return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
+    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(2.0,1.0,0.0),vec3(0.5,0.20,0.25) );
-    // return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
+    return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
   }
 
   // --------------------------------------------------------
@@ -130,11 +130,9 @@ const frag = glsl(/* glsl */ `
     return d; // * 4. for appear effect;
   }
 
-  float sdRing( in vec2 p, in vec2 n, in float r, in float th ) {
-    p.x = abs(p.x);
-    p = mat2(n.x,n.y,-n.y,n.x)*p;
-    return max( abs(length(p)-r)-th*0.5,
-                length(vec2(p.x,max(0.0,abs(r-p.y)-th*0.5)))*sign(p.x) );
+  float sdTorus( vec3 p, vec2 t ) {
+    vec2 q = vec2(length(p.xz)-t.x,p.y);
+    return length(q)-t.y;
   }
 
   float map(vec3 p) {
@@ -163,27 +161,13 @@ const frag = glsl(/* glsl */ `
 
     p.xy += repeat / 2.;
     pMod2(p.xy, vec2(repeat));
-    p.xy = rotate(p.xy, playhead * -1.505 *PI);
-
-    // d = sdEquilateralTriangle(p.xy, .09) * .5;
-    float t = PI * .25;
-    vec2 cs = vec2(cos(t), sin(t));
-    const float ra = 0.0625;
-    const float th = 0.01;
+    p.xy = rotate(p.xy, playhead * -PI / 2.);
 
     // distance
-    d = sdRing(p.xy, cs, ra, th) * .5;
+    float r = repeat * .4;
+    d = sdTorus(p, vec2(.75*r, .3*r));
 
-    // vec2 gv = fract(p.xy)-.5;
-    // vec2 id = floor(p.xy);
-    // float width = .1;
-    // // if(n<.5) gv.x *= -1.;
-    // float dd = abs(abs(gv.x+gv.y)-.5);
-    // dd = length (gv-sign (gv.x+gv.y)*.5) - .5;
-    // d = smoothstep(.01, -.001, abs(dd)-width);
-
-    // Thickness of the shape
-    d = smax(d, abs(p.z) - .1, .01);
+    // d = smax(d, abs(p.z) - .05, .01);
 
     d = fixDistance(d, k);
 
