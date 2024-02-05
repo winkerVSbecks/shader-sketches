@@ -176,6 +176,7 @@ const frag = glsl(/* glsl */ `
 
     p.xy += repeat / 2.;
     pMod2(p.xy, vec2(repeat));
+    p.xz = rotate(p.xz, PI*.5);
 
     float r = repeat * .3;
     d = sdHelix(p, 0.0625, r, r * .25);

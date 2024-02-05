@@ -111,8 +111,6 @@ const frag = glsl(/*glsl*/ `
     return d;
   }
 
-  vec2 modelUv;
-
   vec3 sdgPie( in vec2 p, in vec2 sc, in float r ) {
     float s = sign(p.x); p.x = abs(p.x);
     float l = length(p);
@@ -141,7 +139,6 @@ const frag = glsl(/*glsl*/ `
 
     vec2 uv;
     float d = fTorus(p4, uv);
-    modelUv = uv;
 
     // Recreate domain to be wrapped around the torus surface
     // xy = surface / face, z = depth / distance
