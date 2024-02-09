@@ -12,7 +12,7 @@ const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 6,
+  duration: 8,
   fps: 60,
   playbackRate: 60,
 };
@@ -48,13 +48,13 @@ const frag = glsl(/* glsl */ `
 
   vec3 spectrum(float n) {
     // n = n * sin(playhead*PI);
-    vec3 a = pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
-    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.10,0.20) );
-    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.3,0.20,0.20) );
+    // vec3 a = pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
+    // vec3 a = pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.10,0.20) );
+    vec3 a = pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.3,0.20,0.20) );
     vec3 b = pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,0.5),vec3(0.8,0.90,0.30) );
+    // vec3 b = pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,0.5),vec3(0.8,0.90,0.30) );
     return mix(a, b, sin(playhead*PI));
 
-    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(2.0,1.0,0.0),vec3(0.5,0.20,0.25) );
     // return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
   }
@@ -103,7 +103,7 @@ const frag = glsl(/* glsl */ `
     uv = (vec2(
         atan(p4.y, p4.x),
         atan(p4.z, p4.w)
-    ) / PI) * .5 + .5;
+    ) / PI) * .5 + .5*playhead;
 
     return d;
   }
@@ -136,9 +136,9 @@ const frag = glsl(/* glsl */ `
   float map(vec3 p) {
     float k;
 
-    p.xy = rotate(p.xy, -playhead * 2.*PI);
-    p.yz = rotate(p.yz, playhead * 2.*PI);
-    p.zx = rotate(p.zx, -playhead * 2.*PI);
+    // p.xy = rotate(p.xy, -playhead * 2.*PI);
+    // p.yz = rotate(p.yz, playhead * 2.*PI);
+    // p.zx = rotate(p.zx, -playhead * 2.*PI);
 
     vec4 p4 = inverseStereographic(p,k);
 
@@ -147,14 +147,10 @@ const frag = glsl(/* glsl */ `
     // The inside-out rotation puts the torus at a different
     // orientation, so rotate to point it at back in the same
     // direction
-    // p4.zy = rotate(p4.zy, playhead * -PI);
+    p4.zy = rotate(p4.zy, -PI * .25);
 
     // Rotate in 4D, turning the torus inside-out
-    // p4.xw = rotate(p4.xw, playhead * -PI);
-
-    // p4.xy = rotate(p4.xy, -playhead * PI);
-    // p4.yz = rotate(p4.yz, playhead * PI);
-    // p4.zx = rotate(p4.zx, -playhead * PI);
+    p4.xw = rotate(p4.xw, -PI * .25);
 
     vec2 uv;
     p4 *= 12.;
@@ -164,6 +160,7 @@ const frag = glsl(/* glsl */ `
     // xy = surface / face, z = depth / distance
     float uvScale = 2.25; // Magic number that makes xy distances the same scale as z distances
     p = vec3(uv * uvScale, d);
+    vec2 id = floor(p.xy);
 
     float n = 20.;
     float repeat = uvScale / n;
