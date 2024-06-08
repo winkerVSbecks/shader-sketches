@@ -1,11 +1,9 @@
 const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
 const glsl = require('glslify');
-const Random = require('canvas-sketch-util/random');
-const tome = require('chromotome');
-const THREE = require('three');
-const Color = require('canvas-sketch-util/color');
 const createMouse = require('../../utils/mouse');
+
+const MODE = 'PRINT'; // 'VIDEO'
 
 // Setup our sketch
 const settings = {

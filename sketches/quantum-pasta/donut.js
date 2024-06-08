@@ -1,20 +1,24 @@
 const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
 const glsl = require('glslify');
-const Random = require('canvas-sketch-util/random');
-const tome = require('chromotome');
-const THREE = require('three');
-const Color = require('canvas-sketch-util/color');
 const createMouse = require('../../utils/mouse');
+
+const MODE = 'PRINT'; // 'VIDEO'
 
 // Setup our sketch
 const settings = {
-  dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
   duration: 6,
   fps: 60,
   playbackRate: 60,
+  ...(MODE === 'PRINT'
+    ? {
+        dimensions: [12.5, 12.5],
+        pixelsPerInch: 300,
+        units: 'in',
+      }
+    : { dimensions: [1080, 1080] }),
 };
 
 // Based on https://www.shadertoy.com/view/WdB3Dw
