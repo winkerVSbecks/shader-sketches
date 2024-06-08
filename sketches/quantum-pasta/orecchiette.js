@@ -5,14 +5,14 @@ const Random = require('canvas-sketch-util/random');
 const tome = require('chromotome');
 const THREE = require('three');
 const Color = require('canvas-sketch-util/color');
-const createMouse = require('../utils/mouse');
+const createMouse = require('../../utils/mouse');
 
 // Setup our sketch
 const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 6,
+  duration: 10,
   fps: 60,
   playbackRate: 60,
 };
@@ -33,7 +33,7 @@ const frag = glsl(/* glsl */ `
   // Keep iteration count too low to pass through entire model,
   // giving the effect of fogged glass
   const float MAX_STEPS = 82.;
-  const float FUDGE_FACTORR = .5; //.8;
+  const float FUDGE_FACTORR = .4; //.8;
   const float INTERSECTION_PRECISION = .001;
   const float MAX_DIST = 20.;
 
@@ -47,10 +47,10 @@ const frag = glsl(/* glsl */ `
   }
 
   vec3 spectrum(float n) {
-    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
+    return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.10,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.3,0.20,0.20) );
-    return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,0.5),vec3(0.8,0.90,0.30) );
+    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,0.5),vec3(0.8,0.90,0.30) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(2.0,1.0,0.0),vec3(0.5,0.20,0.25) );
     // return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
@@ -130,29 +130,25 @@ const frag = glsl(/* glsl */ `
     return d; // * 4. for appear effect;
   }
 
-  float sdRing( in vec2 p, in float r, in float th ) {
-    float d = length(p)-r;
-    return abs(d) - th;
-  }
+  vec2 map(vec3 p) {
 
-  float map(vec3 p) {
-    // p.xy = rotate(p.xy, -playhead * TAU);
-    // p.yz = rotate(p.yz, playhead * TAU);
-    // p.zx = rotate(p.zx, -playhead * TAU);
+    p.xy = rotate(p.xy, -playhead * PI);
+    p.yz = rotate(p.yz, playhead * PI);
+    p.zx = rotate(p.zx, -playhead * PI);
 
     float k;
     vec4 p4 = inverseStereographic(p,k);
-    // p4 *= 6.;
 
     // The inside-out rotation puts the torus at a different
     // orientation, so rotate to point it at back in the same
     // direction
-    p4.zy = rotate(p4.zy, playhead * -PI / 2.);
+    p4.zy = rotate(p4.zy, playhead * -PI);
 
     // Rotate in 4D, turning the torus inside-out
-    p4.xw = rotate(p4.xw, playhead * -PI / 2.);
+    p4.xw = rotate(p4.xw, playhead * -PI);
 
     vec2 uv;
+    p4 *= 12.;
     float d = fTorus(p4, uv);
 
     // Recreate domain to be wrapped around the torus surface
@@ -166,14 +162,19 @@ const frag = glsl(/* glsl */ `
     p.xy += repeat / 2.;
     pMod2(p.xy, vec2(repeat));
 
-    d = sdRing(p.xy, 0.0625, 0.01);
+    p.xy = rotate(p.xy, -playhead * PI);
+    p.yz = rotate(p.yz, playhead * PI);
+    p.zx = rotate(p.zx, -playhead * PI);
 
-    // Thickness of the shape
-    d = smax(d, abs(p.z) - .1, .01);
+    // distance
+    float r = repeat * .4;
+    d = length(p.xy) - r;
+    d += sin(PI*2.*p.x)*sin(PI*2.*p.y)*sin(PI*2.*p.z);
+    d = smax(d, abs(p.z) - .01, .01);
 
     d = fixDistance(d, k);
 
-    return d;
+    return vec2(d, p.z);
   }
 
   vec3 GetRayDir(vec2 uv, vec3 p, vec3 l, float z) {
@@ -188,7 +189,7 @@ const frag = glsl(/* glsl */ `
 
   void main () {
     vec2 p = (-1.0 + 2.0 * vUv);
-    vec3 ro = vec3(3, 3, -3);
+    vec3 ro = vec3(2., 2., -2.);
 
     vec3 rd = GetRayDir(p, ro, vec3(0,0.,0), 1.);
     vec3 rayPosition = ro;
@@ -203,7 +204,8 @@ const frag = glsl(/* glsl */ `
       rayLength += max(INTERSECTION_PRECISION, abs(distance) * FUDGE_FACTORR);
       rayPosition = ro + rd * rayLength;
 
-      distance = map(rayPosition);
+      vec2 res = map(rayPosition);
+      distance = res.x;
 
       // Add a lot of light when we're really close to the surface
       c = vec3(max(0., .01 - abs(distance)) * .5);
@@ -218,7 +220,7 @@ const frag = glsl(/* glsl */ `
       c *= rl;
 
       // Vary colour as we move through space
-      c *= spectrum(rl * 6. - .6);
+      c *= spectrum(sin(playhead*PI) * (rl * 6. - .6));
 
       color += c;
 

@@ -5,7 +5,7 @@ const Random = require('canvas-sketch-util/random');
 const tome = require('chromotome');
 const THREE = require('three');
 const Color = require('canvas-sketch-util/color');
-const createMouse = require('../utils/mouse');
+const createMouse = require('../../utils/mouse');
 
 // Setup our sketch
 const settings = {
@@ -48,10 +48,10 @@ const frag = glsl(/* glsl */ `
 
   vec3 spectrum(float n) {
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
-    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.10,0.20) );
+    return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.10,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.3,0.20,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,0.5),vec3(0.8,0.90,0.30) );
-    return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
+    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(2.0,1.0,0.0),vec3(0.5,0.20,0.25) );
     // return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
   }
@@ -159,11 +159,11 @@ const frag = glsl(/* glsl */ `
 
     // distance
     float r = repeat * .4;
-    float d2 = length(p.xy) - 1.*r;
-    float d1 = length(p.xy) - 0.4*r;
+    float d2 = min(length(p.xy + r), length(p.xy - r)) - 1.25*r;
+    float d1 = min(length(p.xy + r), length(p.xy - r)) - 0.81*r;
     d = max(-d1,d2);
 
-    d = smax(d, abs(p.z) - (.05 /* + .1 * sin(playhead * PI) */), .01);
+    d = smax(d, abs(p.z) - .1, .01);
 
     d = fixDistance(d, k);
 

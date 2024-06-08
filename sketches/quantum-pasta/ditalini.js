@@ -5,7 +5,7 @@ const Random = require('canvas-sketch-util/random');
 const tome = require('chromotome');
 const THREE = require('three');
 const Color = require('canvas-sketch-util/color');
-const createMouse = require('../utils/mouse');
+const createMouse = require('../../utils/mouse');
 
 // Setup our sketch
 const settings = {
@@ -51,9 +51,9 @@ const frag = glsl(/* glsl */ `
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.10,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.3,0.20,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,0.5),vec3(0.8,0.90,0.30) );
-    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
+    return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(2.0,1.0,0.0),vec3(0.5,0.20,0.25) );
-    return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
+    // return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
   }
 
   // --------------------------------------------------------
@@ -130,11 +130,6 @@ const frag = glsl(/* glsl */ `
     return d; // * 4. for appear effect;
   }
 
-  float sdTorus( vec3 p, vec2 t ) {
-    vec2 q = vec2(length(p.xz)-t.x,p.y);
-    return length(q)-t.y;
-  }
-
   float map(vec3 p) {
     float k;
     vec4 p4 = inverseStereographic(p,k);
@@ -161,13 +156,14 @@ const frag = glsl(/* glsl */ `
 
     p.xy += repeat / 2.;
     pMod2(p.xy, vec2(repeat));
-    p.xy = rotate(p.xy, playhead * -PI / 2.);
 
     // distance
     float r = repeat * .4;
-    d = sdTorus(p, vec2(.75*r, .3*r));
+    float d2 = length(p.xy) - 1.*r;
+    float d1 = length(p.xy) - 0.4*r;
+    d = max(-d1,d2);
 
-    // d = smax(d, abs(p.z) - .05, .01);
+    d = smax(d, abs(p.z) - (.05 /* + .1 * sin(playhead * PI) */), .01);
 
     d = fixDistance(d, k);
 

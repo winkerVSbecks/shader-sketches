@@ -5,14 +5,14 @@ const Random = require('canvas-sketch-util/random');
 const tome = require('chromotome');
 const THREE = require('three');
 const Color = require('canvas-sketch-util/color');
-const createMouse = require('../utils/mouse');
+const createMouse = require('../../utils/mouse');
 
 // Setup our sketch
 const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 8,
+  duration: 6,
   fps: 60,
   playbackRate: 60,
 };
@@ -33,9 +33,9 @@ const frag = glsl(/* glsl */ `
   // Keep iteration count too low to pass through entire model,
   // giving the effect of fogged glass
   const float MAX_STEPS = 82.;
-  const float FUDGE_FACTORR = .4; //.8;
+  const float FUDGE_FACTORR = .5; //.8;
   const float INTERSECTION_PRECISION = .001;
-  const float MAX_DIST = 10.;
+  const float MAX_DIST = 20.;
 
   // --------------------------------------------------------
   // Spectrum colour palette
@@ -130,38 +130,27 @@ const frag = glsl(/* glsl */ `
     return d; // * 4. for appear effect;
   }
 
-  float sdHelix( in vec3 p, float fr, float r1, float r2 ) {
-    vec2  nline = vec2(fr, 6.283185*r1 );
-    vec2  pline = vec2(nline.y, -nline.x);
-    float repeat = nline.x*nline.y;
-
-    vec2  pc = vec2(p.x,r1*atan(p.y,p.z));              // to cylindrical
-
-    vec2  pp = vec2( dot(pc,pline),                     // project to line
-                      dot(pc,nline));
-
-    // pp.x = round(pp.x/repeat)*repeat;                   // repeat in x
-    pp.x = floor(pp.x/repeat + + 0.5)*repeat;                   // repeat in x
-
-    vec2 qc = (nline*pp.y+pline*pp.x)/dot(nline,nline); // un project to cylindrical
-    qc.y /= r1;
-
-    vec3 q = vec3(qc.x, sin(qc.y)*r1, cos(qc.y)*r1 );   // to cartesian
-
-    return length(p-q)-r2;
+  float sdRing( in vec2 p, in float r, in float th ) {
+    float d = length(p)-r;
+    return abs(d) - th;
   }
 
   float map(vec3 p) {
+    // p.xy = rotate(p.xy, -playhead * TAU);
+    // p.yz = rotate(p.yz, playhead * TAU);
+    // p.zx = rotate(p.zx, -playhead * TAU);
+
     float k;
     vec4 p4 = inverseStereographic(p,k);
+    // p4 *= 6.;
 
     // The inside-out rotation puts the torus at a different
     // orientation, so rotate to point it at back in the same
     // direction
-    p4.zy = rotate(p4.zy, playhead * -PI);
+    p4.zy = rotate(p4.zy, playhead * -PI / 2.);
 
     // Rotate in 4D, turning the torus inside-out
-    p4.xw = rotate(p4.xw, playhead * -PI);
+    p4.xw = rotate(p4.xw, playhead * -PI / 2.);
 
     vec2 uv;
     float d = fTorus(p4, uv);
@@ -176,10 +165,11 @@ const frag = glsl(/* glsl */ `
 
     p.xy += repeat / 2.;
     pMod2(p.xy, vec2(repeat));
-    p.xz = rotate(p.xz, PI*.5);
 
-    float r = repeat * .3;
-    d = sdHelix(p, 0.0625, r, r * .25);
+    d = sdRing(p.xy, 0.0625, 0.01);
+
+    // Thickness of the shape
+    d = smax(d, abs(p.z) - .1, .01);
 
     d = fixDistance(d, k);
 
@@ -198,7 +188,7 @@ const frag = glsl(/* glsl */ `
 
   void main () {
     vec2 p = (-1.0 + 2.0 * vUv);
-    vec3 ro = vec3(-3.5, 3.5, 3.5);
+    vec3 ro = vec3(3, 3, -3);
 
     vec3 rd = GetRayDir(p, ro, vec3(0,0.,0), 1.);
     vec3 rayPosition = ro;

@@ -5,14 +5,14 @@ const Random = require('canvas-sketch-util/random');
 const tome = require('chromotome');
 const THREE = require('three');
 const Color = require('canvas-sketch-util/color');
-const createMouse = require('../utils/mouse');
+const createMouse = require('../../utils/mouse');
 
 // Setup our sketch
 const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 6,
+  duration: 8,
   fps: 60,
   playbackRate: 60,
 };
@@ -35,7 +35,7 @@ const frag = glsl(/* glsl */ `
   const float MAX_STEPS = 82.;
   const float FUDGE_FACTORR = .4; //.8;
   const float INTERSECTION_PRECISION = .001;
-  const float MAX_DIST = 20.;
+  const float MAX_DIST = 10.;
 
   // --------------------------------------------------------
   // Spectrum colour palette
@@ -138,9 +138,10 @@ const frag = glsl(/* glsl */ `
     vec2  pc = vec2(p.x,r1*atan(p.y,p.z));              // to cylindrical
 
     vec2  pp = vec2( dot(pc,pline),                     // project to line
-                     dot(pc,nline));
+                      dot(pc,nline));
 
-    pp.x = floor(pp.x/repeat)*repeat;                   // repeat in x
+    // pp.x = round(pp.x/repeat)*repeat;                   // repeat in x
+    pp.x = floor(pp.x/repeat + + 0.5)*repeat;                   // repeat in x
 
     vec2 qc = (nline*pp.y+pline*pp.x)/dot(nline,nline); // un project to cylindrical
     qc.y /= r1;
@@ -163,7 +164,6 @@ const frag = glsl(/* glsl */ `
     p4.xw = rotate(p4.xw, playhead * -PI);
 
     vec2 uv;
-    p4 *= 12.;
     float d = fTorus(p4, uv);
 
     // Recreate domain to be wrapped around the torus surface
@@ -177,8 +177,8 @@ const frag = glsl(/* glsl */ `
     p.xy += repeat / 2.;
     pMod2(p.xy, vec2(repeat));
 
-    // distance
-    d = sdHelix(p, .4 * .05, .4 * .05, .2 * .05) - .01; //.1;
+    float r = repeat * .3;
+    d = sdHelix(p, 0.0625, r, r * .25);
 
     d = fixDistance(d, k);
 
@@ -197,7 +197,7 @@ const frag = glsl(/* glsl */ `
 
   void main () {
     vec2 p = (-1.0 + 2.0 * vUv);
-    vec3 ro = vec3(3, 3, -3);
+    vec3 ro = vec3(-3.5, 3.5, 3.5);
 
     vec3 rd = GetRayDir(p, ro, vec3(0,0.,0), 1.);
     vec3 rayPosition = ro;
