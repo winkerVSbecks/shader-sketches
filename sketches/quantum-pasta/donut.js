@@ -3,7 +3,7 @@ const createShader = require('canvas-sketch-util/shader');
 const glsl = require('glslify');
 const createMouse = require('../../utils/mouse');
 
-const MODE = 'PRINT'; // 'VIDEO'
+const MODE = process.env.MODE || 'PRINT'; // 'VIDEO'
 
 // Setup our sketch
 const settings = {
@@ -12,13 +12,15 @@ const settings = {
   duration: 6,
   fps: 60,
   playbackRate: 60,
+  scaleToView: true,
   ...(MODE === 'PRINT'
     ? {
-        dimensions: [12.5, 12.5],
+        dimensions: [12, 12],
         pixelsPerInch: 300,
         units: 'in',
       }
     : { dimensions: [1080, 1080] }),
+  suffix: MODE === 'PRINT' ? '12.5x12.5' : '',
 };
 
 // Based on https://www.shadertoy.com/view/WdB3Dw
@@ -245,7 +247,13 @@ const sketch = ({ gl, canvas }) => {
     gl,
     frag,
     uniforms: {
-      playhead: ({ playhead }) => playhead,
+      playhead: ({ playhead }) => {
+        if (MODE === 'PRINT') {
+          console.log(mouse.position[0]);
+          return mouse.position[0];
+        }
+        return playhead;
+      },
       mouse: () => mouse.position,
     },
   });

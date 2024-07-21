@@ -2,8 +2,9 @@ const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
 const glsl = require('glslify');
 const createMouse = require('../../utils/mouse');
+const { mapRange } = require('canvas-sketch-util/math');
 
-const MODE = 'PRINT'; // 'VIDEO'
+const MODE = process.env.MODE || 'PRINT'; // 'VIDEO'
 
 // Setup our sketch
 const settings = {
@@ -12,13 +13,15 @@ const settings = {
   duration: 6,
   fps: 60,
   playbackRate: 60,
+  scaleToView: true,
   ...(MODE === 'PRINT'
     ? {
-        dimensions: [12.5, 12.5],
+        dimensions: [12, 12],
         pixelsPerInch: 300,
         units: 'in',
       }
     : { dimensions: [1080, 1080] }),
+  suffix: MODE === 'PRINT' ? '12x12' : '',
 };
 
 // Based on https://www.shadertoy.com/view/WdB3Dw
@@ -53,9 +56,10 @@ const frag = glsl(/* glsl */ `
   vec3 spectrum(float n) {
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.10,0.20) );
+    return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(0.0,0.10,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.3,0.20,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,0.5),vec3(0.8,0.90,0.30) );
-    return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
+    // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,0.7,0.4),vec3(0.0,0.15,0.20) );
     // return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(2.0,1.0,0.0),vec3(0.5,0.20,0.25) );
     // return pal( n, vec3(0.8,0.5,0.4),vec3(0.2,0.4,0.2),vec3(2.0,1.0,1.0),vec3(0.0,0.25,0.25) );
   }
@@ -241,7 +245,13 @@ const sketch = ({ gl, canvas }) => {
     gl,
     frag,
     uniforms: {
-      playhead: ({ playhead }) => playhead,
+      playhead: ({ playhead }) => {
+        if (MODE === 'PRINT') {
+          console.log(mouse.position[0]);
+          return 0.5; // .45 // .55 // mouse.position[0];
+        }
+        return playhead;
+      },
       mouse: () => mouse.position,
     },
   });

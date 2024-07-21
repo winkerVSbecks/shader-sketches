@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "canvas-sketch --output=renders --stream --open"
+    "start": "canvas-sketch --output=renders --stream --open",
+    "start:print": "MODE=PRINT canvas-sketch --output=renders --stream --open"
   },
   "keywords": [],
   "author": "",

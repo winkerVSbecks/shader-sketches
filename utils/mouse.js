@@ -21,9 +21,9 @@ function createMouse(canvas, opts = {}) {
   }
 
   function move(ev) {
-    if (mouse.moving) {
-      mouse.position = mouseEventOffset(ev, canvas);
-    }
+    // if (mouse.moving) {
+    mouse.position = mouseEventOffset(ev, canvas);
+    // }
     if (opts.onMove) opts.onMove();
   }
 

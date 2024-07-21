@@ -1,20 +1,26 @@
 const canvasSketch = require('canvas-sketch');
 const createShader = require('canvas-sketch-util/shader');
 const glsl = require('glslify');
-const Random = require('canvas-sketch-util/random');
-const tome = require('chromotome');
-const THREE = require('three');
-const Color = require('canvas-sketch-util/color');
 const createMouse = require('../../utils/mouse');
+
+const MODE = process.env.MODE || 'PRINT'; // 'VIDEO'
 
 // Setup our sketch
 const settings = {
-  dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 8,
+  duration: 6,
   fps: 60,
   playbackRate: 60,
+  scaleToView: true,
+  ...(MODE === 'PRINT'
+    ? {
+        dimensions: [12, 12],
+        pixelsPerInch: 300,
+        units: 'in',
+      }
+    : { dimensions: [1080, 1080] }),
+  suffix: MODE === 'PRINT' ? '12x12' : '',
 };
 
 // Based on https://www.shadertoy.com/view/WdB3Dw
@@ -252,7 +258,13 @@ const sketch = ({ gl, canvas }) => {
     gl,
     frag,
     uniforms: {
-      playhead: ({ playhead }) => playhead,
+      playhead: ({ playhead }) => {
+        if (MODE === 'PRINT') {
+          console.log(mouse.position[0]);
+          return mouse.position[0]; // 0.38; // 0.68;
+        }
+        return playhead;
+      },
       mouse: () => mouse.position,
     },
   });
