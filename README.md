@@ -11,3 +11,7 @@ This project is using [canvas-sketch](https://github.com/mattdesl/canvas-sketch)
 3. Run `npm start sketches/<sketch_filename>` to start a sketch. eg: `npm start sketches/sdf-fogged-glass`
 
 This will start a development server with features such as live-reloading, export, etc. For more info, see [Installing and Using canvas-sketch](https://github.com/mattdesl/canvas-sketch/blob/master/docs/installation.md)
+
+---
+
+Copyright (c) 2024 Varun Vachhar
